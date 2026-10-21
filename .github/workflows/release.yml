@@ -55,6 +55,8 @@ jobs:
           SORTOPIA_KEYSTORE_PASSWORD: ${{ secrets.SORTOPIA_KEYSTORE_PASSWORD }}
           SORTOPIA_KEY_ALIAS: ${{ secrets.SORTOPIA_KEY_ALIAS }}
           SORTOPIA_KEY_PASSWORD: ${{ secrets.SORTOPIA_KEY_PASSWORD }}
+          # Optional repository variable: build-release then checks the APK is signed by this cert.
+          SORTOPIA_UPLOAD_CERT_SHA256: ${{ vars.SORTOPIA_UPLOAD_CERT_SHA256 }}
         run: devenv shell -- build-release
       - name: Remove keystore
         if: always()

@@ -59,12 +59,46 @@ Bump `versionCode` (and `versionName`) in `android/build.gradle.kts` first. Play
 build-release
 ```
 
-This builds both artifacts and prints the signing certificate:
+This builds both artifacts, then runs `verify-release` on them:
 
 - `android/build/outputs/bundle/release/android-release.aab`: upload this to Google Play
-- `android/build/outputs/apk/release/android-release.apk`: for sideloading (`adb install`)
+- `android/build/outputs/apk/release/android-release.apk`: for sideloading
 
 Without signing configured, Gradle still builds the release variant, but unsigned (`android-release-unsigned.apk`). `build-release` treats that as an error.
+
+### 4. Verify the signature
+
+`build-release` already does this, but you can rerun it on its own:
+
+```sh
+verify-release
+```
+
+It fails unless:
+
+- the APK has a valid signature (`apksigner`) and the AAB has one too (`jarsigner`)
+- both are signed by the same certificate
+- that certificate isn't the Android debug key
+
+It prints the signer and the certificate's SHA-256. To also check that the build was signed by **your** upload key, pin that fingerprint (it's public, not a secret):
+
+```sh
+keytool -list -v -keystore ~/.config/sortopia/upload-keystore.jks | grep SHA256   # once
+export SORTOPIA_UPLOAD_CERT_SHA256=AB:CD:...   # colons and case don't matter
+verify-release
+```
+
+### 5. Sideload onto a device
+
+Enable USB debugging on the phone (or start the emulator with `emulator-start`), connect it, then:
+
+```sh
+install-release
+```
+
+This verifies the APK, then installs it with `adb install -r`, which updates an existing install and keeps its save. With several devices attached, choose one with `ANDROID_SERIAL=<serial from adb devices> install-release`.
+
+If a **debug** build is already installed, the install fails: Android won't update an app with one signed by a different key. The script never uninstalls for you, because uninstalling deletes the save. If losing it is fine, run `adb uninstall com.sortopia` and then `install-release` again.
 
 ### Releasing from CI
 
@@ -78,6 +112,8 @@ One-time setup: add these repository secrets (**Settings → Secrets and variabl
 | `SORTOPIA_KEYSTORE_PASSWORD` | keystore password |
 | `SORTOPIA_KEY_ALIAS` | `upload` |
 | `SORTOPIA_KEY_PASSWORD` | key password |
+
+Optionally, add the upload certificate's SHA-256 as a repository **variable** (Variables tab, not Secrets) named `SORTOPIA_UPLOAD_CERT_SHA256`. The build then fails unless it was signed by that key.
 
 To release, bump `versionCode` and `versionName`, merge to `main`, then push a matching tag:
 

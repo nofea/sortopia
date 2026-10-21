@@ -42,7 +42,9 @@ All local work happens inside **devenv** ([devenv.sh](https://devenv.sh)). Nothi
 | `fmt` | ktlint auto-format |
 | `unit-test` | `:core:test`, the headless JUnit 5 suite |
 | `build-debug` | `:android:assembleDebug` |
-| `build-release` | Signed release AAB + APK; fails if signing isn't configured (README, "Release build") |
+| `build-release` | Signed release AAB + APK, then `verify-release`; fails if signing isn't configured (README, "Release build") |
+| `verify-release` | Checks the release APK and AAB are signed, by the same key, not the debug key (and by `SORTOPIA_UPLOAD_CERT_SHA256` if set) |
+| `install-release` | Verifies, then sideloads the release APK onto the connected device (`ANDROID_SERIAL` picks one); never uninstalls |
 | `keystore-create` | Creates the upload keystore (default `~/.config/sortopia/upload-keystore.jks`), never overwrites |
 | `run-desktop` | Runs the desktop launcher (dev only; save in `~/.sortopia`) |
 | `avd-create` | Creates the `sortopia` AVD if it's missing |
