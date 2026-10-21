@@ -279,6 +279,7 @@ Splash → World Map ─┬→ Level Select → Gameplay → Level Complete ─�
 - **Game feel:** satisfying pour, pop and seal animations; a celebration effect on level completion; subtle idle animations.
 - **Audio:** sound effects for select, pour, illegal move, tube complete, level complete, and helper use. A calm music loop per world. The splash reuses the pour and tube-complete sounds and plays no music.
 - **Haptics:** light haptic feedback on pour and tube completion.
+- **App icon:** one upright glass tube holding three red hearts with faces, its lid popping off with a few pop lines. Thick ink outlines on the warm World 1 peach gradient. It ships as an adaptive icon with a dedicated monochrome layer for themed icons, and the same art is the 512 px Play Store icon. Everything stays inside the adaptive-icon safe zone.
 
 ---
 

@@ -46,6 +46,7 @@ All local work happens inside **devenv** ([devenv.sh](https://devenv.sh)). Nothi
 | `avd-create` | Creates the `sortopia` AVD if it's missing |
 | `emulator-start` | Boots the AVD (pass `-no-window` for headless), waits for boot, disables animations |
 | `emulator-stop` | Shuts the emulator down |
+| `gen-icon` | Regenerates the launcher icon layers, the store icon and a mask preview (`tools/gen_icon.py`) |
 | `ui-test` | `:android:connectedDebugAndroidTest` on the running emulator |
 | `vuln-scan` | OSV scan: fails on vulnerable **shipped** dependencies (`android/gradle.lockfile`); build tooling is informational only |
 
@@ -122,6 +123,7 @@ Other useful commands:
 - `android/src/androidTest`: UI Automator tests (`GameDriver` reads the bridge and taps real coordinates)
 - `assets/`: font (Nunito, OFL), `i18n/strings.properties` (all player-facing text), `sfx/`, `music/`
 - `tools/gen_audio.py`: regenerates the placeholder audio deterministically
+- `tools/gen_icon.py`: generates the launcher icon drawables (`ic_launcher_*.xml`) and `store/` (`icon.svg`, `icon-512.png` for Play, `icon-preview.png` showing masks and themed icons). Edit the script, not the generated files.
 - `config/detekt/detekt.yml`: detekt rules (on top of the defaults)
 
 ## Current state / known gaps

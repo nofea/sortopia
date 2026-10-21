@@ -28,6 +28,10 @@ in
     pkgs.git
     # Vulnerability scan of the locked dependencies (see the vuln-scan script).
     pkgs.osv-scanner
+    # Asset generators in tools/ (dev only, never shipped): numpy for gen_audio.py,
+    # rsvg-convert for gen_icon.py.
+    (pkgs.python3.withPackages (ps: [ ps.numpy ]))
+    pkgs.librsvg
   ];
 
   env.SORTOPIA_AVD = avdName;
@@ -84,6 +88,7 @@ in
         || echo "Build-tooling findings written to ''${TMPDIR:-/tmp}/osv-build-tooling.txt (not shipped in the app)"
     '';
     emulator-stop.exec = ''adb emu kill'';
+    gen-icon.exec = ''python3 tools/gen_icon.py "$@"'';
   };
 
   # Linters run before every commit.

@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="sortopia_background">#FFF1D6</color>
-    <color name="sortopia_icon_background">#FFD9B0</color>
 
     <style name="GdxTheme" parent="android:Theme.Material.Light.NoActionBar.Fullscreen">
         <item name="android:windowBackground">@color/sortopia_background</item>
