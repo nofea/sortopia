@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Three glass tubes with sorted items. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#B3FFFFFF" android:pathData="M30,34h12v34a6,6 0,0 1,-12 0z" />
+    <path android:fillColor="#B3FFFFFF" android:pathData="M48,30h12v38a6,6 0,0 1,-12 0z" />
+    <path android:fillColor="#B3FFFFFF" android:pathData="M66,34h12v34a6,6 0,0 1,-12 0z" />
+    <path android:fillColor="#EF5350" android:pathData="M36,66m-4.5,0a4.5,4.5 0,1 1,9 0a4.5,4.5 0,1 1,-9 0" />
+    <path android:fillColor="#EF5350" android:pathData="M36,56m-4.5,0a4.5,4.5 0,1 1,9 0a4.5,4.5 0,1 1,-9 0" />
+    <path android:fillColor="#FFA726" android:pathData="M49.5,61.5h9v9h-9z" />
+    <path android:fillColor="#FFA726" android:pathData="M49.5,51.5h9v9h-9z" />
+    <path android:fillColor="#FFA726" android:pathData="M49.5,41.5h9v9h-9z" />
+    <path android:fillColor="#42A5F5" android:pathData="M72,61l5,9h-10z" />
+</vector>

@@ -1,0 +1,308 @@
+package com.sortopia.ui.screens
+
+import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.scenes.scene2d.actions.Actions
+import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane
+import com.badlogic.gdx.scenes.scene2d.ui.Table
+import com.badlogic.gdx.scenes.scene2d.ui.TextButton
+import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
+import com.badlogic.gdx.utils.Align
+import com.sortopia.SortopiaGame
+import com.sortopia.gen.Tuning
+import com.sortopia.model.LevelId
+import com.sortopia.save.LoadOutcome
+import com.sortopia.ui.Panels
+import com.sortopia.ui.Sfx
+import com.sortopia.ui.ShapeActor
+import com.sortopia.ui.Theme
+import com.sortopia.ui.render.ItemArt
+
+class SplashScreen(
+    game: SortopiaGame,
+) : BaseScreen(game) {
+    override val probeName = "splash"
+    private var elapsed = 0f
+
+    init {
+        val logo =
+            ShapeActor(game) { sr, x, y, w, h ->
+                val types = listOf(0, 4, 5)
+                for ((i, t) in types.withIndex()) {
+                    val cx = x + w * (0.25f + 0.25f * i)
+                    ItemArt.draw(sr, t, cx, y + h / 2 + if (i == 1) 10f else 0f, 56f, false)
+                }
+            }
+        root.add(logo).size(260f, 100f).padBottom(12f).row()
+        root.add(ui.label(str("app.name"), "huge")).row()
+        root.add(ui.label(str("app.tagline"), "soft"))
+        game.prefetch(LevelId.Campaign(1, 1))
+    }
+
+    override fun update(delta: Float) {
+        elapsed += delta
+        if (elapsed > SPLASH_TIME) game.go(WorldMapScreen(game))
+    }
+
+    companion object {
+        private const val SPLASH_TIME = 1.1f
+    }
+}
+
+class WorldMapScreen(
+    game: SortopiaGame,
+) : BaseScreen(game) {
+    override val probeName = "map"
+    private val progress get() = game.progress
+
+    init {
+        game.audio.playMusic(1)
+        val header = Table()
+        header.add(ui.label(str("map.title"), "title")).expandX().left()
+        header.add(ui.coin(24f)).padRight(6f)
+        header.add(probe("wallet", ui.label(progress.wallet.points.toString())))
+        val gear =
+            ui.button("") { game.go(SettingsScreen(game)) }.apply {
+                add(
+                    ShapeActor(game) { sr, x, y, w, h ->
+                        sr.color = Theme.ink
+                        com.sortopia.ui.render.Shapes.star(sr, x + w / 2, y + h / 2, 15f, 11f, 8)
+                        sr.color = Theme.buttonFace
+                        sr.circle(x + w / 2, y + h / 2, 5f, 12)
+                    },
+                ).size(30f)
+            }
+        header.add(probe("settings", gear)).size(56f).padLeft(12f)
+        root.top().pad(12f)
+        root.add(header).expandX().fillX().padBottom(8f).row()
+
+        val list = Table()
+        list.defaults().expandX().fillX().padBottom(10f)
+        list.add(dailyCard()).row()
+        for (w in 1..LevelId.WORLDS) list.add(worldCard(w)).row()
+        list.add(endlessCard()).row()
+        val scroll = ScrollPane(list, assets.skin)
+        scroll.setScrollingDisabled(true, false)
+        scroll.setFadeScrollBars(true)
+        root.add(scroll).expand().fill()
+        showNotices()
+    }
+
+    private fun card(
+        pid: String,
+        title: String,
+        subtitle: String,
+        locked: Boolean,
+        accent: com.badlogic.gdx.graphics.Color,
+        onOpen: () -> Unit,
+    ): Table {
+        val t = ui.panel(if (locked) Theme.locked else Theme.paper)
+        val stripe =
+            ShapeActor(game) { sr, x, y, w, h ->
+                sr.color = accent
+                sr.rect(x, y, w, h)
+            }
+        t.add(stripe).width(10f).fillY().padRight(14f)
+        val text = Table()
+        text.add(ui.label(title, "title", align = Align.left)).expandX().fillX().row()
+        text.add(ui.label(subtitle, "soft", wrap = true, align = Align.left)).expandX().fillX()
+        t.add(text).expandX().fillX()
+        t.touchable = com.badlogic.gdx.scenes.scene2d.Touchable.enabled
+        t.addListener(
+            object : ClickListener() {
+                override fun clicked(
+                    event: com.badlogic.gdx.scenes.scene2d.InputEvent?,
+                    x: Float,
+                    y: Float,
+                ) {
+                    if (hasOverlay) return
+                    game.audio.play(Sfx.CLICK)
+                    if (!locked) onOpen()
+                }
+            },
+        )
+        return probe(pid, t)
+    }
+
+    private fun worldCard(w: Int): Table {
+        val unlocked = progress.isWorldUnlocked(w)
+        val mechanic = Tuning.worldMechanic[w]
+        val mechanicName =
+            when {
+                w == LevelId.WORLDS -> str("mechanic.ALL")
+                mechanic == null -> str("mechanic.none")
+                else -> str("mechanic.${mechanic.name}")
+            }
+        val subtitle =
+            when {
+                unlocked -> mechanicName + "  |  " + str("map.stars", progress.worldStars(w), LevelId.LEVELS_PER_WORLD * 3)
+                !progress.worldFinished(w - 1) -> str("map.locked.finish", str(Theme.world(w - 1).nameKey))
+                else -> str("map.locked.stars", progress.starsMissingFor(w))
+            }
+        val theme = Theme.world(w)
+        return card("world-$w", "$w. ${str(theme.nameKey)}", subtitle, !unlocked, theme.accent) {
+            game.go(LevelSelectScreen(game, w))
+        }
+    }
+
+    private fun endlessCard(): Table {
+        val unlocked = progress.isEndlessUnlocked()
+        val subtitle =
+            if (unlocked) str("map.endless.info", progress.nextEndless(), progress.endlessTotal()) else str("map.endless.locked")
+        return card("endless", str("endless"), subtitle, !unlocked, Theme.endless.accent) {
+            game.go(GameScreen(game, LevelId.Endless(progress.nextEndless())))
+        }
+    }
+
+    private fun dailyCard(): Table {
+        val unlocked = progress.isDailyUnlocked()
+        val today = game.platform.today()
+        val subtitle =
+            when {
+                !unlocked -> str("map.daily.locked")
+                progress.isDailyClaimed(today) -> str("map.daily.done") + "\n" + str("map.daily.streak", progress.dailyStreak(today))
+                else -> str("map.daily.new") + "\n" + str("map.daily.streak", progress.dailyStreak(today))
+            }
+        return card("daily", str("daily"), subtitle, !unlocked, Theme.daily.accent) {
+            game.go(GameScreen(game, progress.dailyFor(today)))
+        }
+    }
+
+    /** Save-reset notice first (SPEC §16), then the offer to resume an unfinished level (SPEC §15). */
+    private fun showNotices() {
+        val outcome = game.loadOutcome
+        if (outcome == LoadOutcome.RESTORED_BACKUP || outcome == LoadOutcome.RESET) {
+            game.loadOutcome = LoadOutcome.OK
+            val panel = ui.panel()
+            panel.add(ui.label(str("notice.title"), "title")).padBottom(10f).row()
+            val key = if (outcome == LoadOutcome.RESET) "notice.reset" else "notice.restored"
+            panel.add(ui.label(str(key), wrap = true)).fillX().padBottom(16f).row()
+            panel
+                .add(
+                    probe(
+                        "overlay-notice-ok",
+                        ui.button(str("notice.ok"), "primary") {
+                            closeOverlay()
+                            offerResume()
+                        },
+                    ),
+                ).width(Panels.WIDE_W)
+                .height(Panels.BUTTON_H)
+            showOverlay("notice", panel)
+            return
+        }
+        offerResume()
+    }
+
+    private fun offerResume() {
+        val ip = progress.data.inProgress ?: return
+        val id = LevelId.parse(ip.levelKey) ?: return
+        val name =
+            when (id) {
+                is LevelId.Campaign -> id.label
+                is LevelId.Endless -> "${str("endless")} ${id.number}"
+                is LevelId.Daily -> str("daily")
+            }
+        val panel = ui.panel()
+        panel.add(ui.label(str("map.resume.title"), "title")).padBottom(10f).row()
+        panel.add(ui.label(str("map.resume.body", name), wrap = true)).fillX().padBottom(16f).row()
+        val row = Table()
+        row.defaults().height(Panels.BUTTON_H).pad(4f).expandX().fillX()
+        row.add(probe("overlay-resume-yes", ui.button(str("map.resume.yes"), "primary") { game.go(GameScreen(game, id, ip)) }))
+        row.add(
+            probe(
+                "overlay-resume-no",
+                ui.button(str("map.resume.no")) {
+                    game.updateSave { it.copy(inProgress = null) }
+                    closeOverlay()
+                },
+            ),
+        )
+        panel.add(row).fillX()
+        showOverlay("resume", panel)
+    }
+
+    override fun onBack() = Gdx.app.exit()
+}
+
+class LevelSelectScreen(
+    game: SortopiaGame,
+    private val world: Int,
+) : BaseScreen(game, Theme.world(world)) {
+    override val probeName = "levels"
+    private val progress get() = game.progress
+
+    init {
+        game.audio.playMusic(world)
+        val header = Table()
+        header.add(probe("back", ui.button("<") { onBack() })).size(56f)
+        header.add(ui.label(str("select.title", str(theme.nameKey)), "title")).expandX()
+        header.add(ui.coin(24f)).padRight(6f)
+        header.add(ui.label(progress.wallet.points.toString()))
+        root.top().pad(12f)
+        root.add(header).expandX().fillX().padBottom(8f).row()
+        root.add(ui.label(str("map.stars", progress.worldStars(world), LevelId.LEVELS_PER_WORLD * 3), "soft")).padBottom(12f).row()
+        val grid = Table()
+        grid.defaults().size(CELL_W, CELL_H).pad(6f)
+        for (l in 1..LevelId.LEVELS_PER_WORLD) {
+            grid.add(levelCell(LevelId.Campaign(world, l)))
+            if (l % COLUMNS == 0) grid.row()
+        }
+        root.add(grid).expand().top()
+        game.prefetch(firstUnsolved())
+    }
+
+    private fun firstUnsolved(): LevelId.Campaign? =
+        (1..LevelId.LEVELS_PER_WORLD).map { LevelId.Campaign(world, it) }.firstOrNull { !progress.isSolved(it) && progress.isUnlocked(it) }
+
+    private fun levelCell(id: LevelId.Campaign): Table {
+        val unlocked = progress.isUnlocked(id)
+        val button = TextButton(id.level.toString(), assets.skin)
+        button.isDisabled = !unlocked
+        button.row()
+        if (unlocked) {
+            val stars = ui.stars(progress.stars(id), 18f)
+            button.add(stars).size(stars.width, stars.height)
+        }
+        button.addListener(
+            object : ClickListener() {
+                override fun clicked(
+                    event: com.badlogic.gdx.scenes.scene2d.InputEvent?,
+                    x: Float,
+                    y: Float,
+                ) {
+                    if (button.isDisabled) return
+                    game.audio.play(Sfx.CLICK)
+                    game.go(GameScreen(game, id))
+                }
+            },
+        )
+        val cell = Table()
+        cell.add(button).expand().fill()
+        if (!game.settings.reduceMotion && unlocked && !progress.isSolved(id)) {
+            button.addAction(Actions.forever(Actions.sequence(Actions.alpha(0.75f, 0.8f), Actions.alpha(1f, 0.8f))))
+        }
+        probe("level-${id.level}", button)
+        return cell
+    }
+
+    override fun onBack() = game.go(WorldMapScreen(game))
+
+    companion object {
+        private const val COLUMNS = 4
+        private const val CELL_W = 96f
+        private const val CELL_H = 96f
+    }
+}
+
+class SettingsScreen(
+    game: SortopiaGame,
+) : BaseScreen(game) {
+    override val probeName = "settings"
+
+    init {
+        val panels = Panels(game, ui) { pid, b -> probe(pid, b) }
+        root.add(panels.settings { onBack() }).width(VIRTUAL_WIDTH - 48f)
+    }
+
+    override fun onBack() = game.go(WorldMapScreen(game))
+}

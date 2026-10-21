@@ -1,0 +1,19 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+
+[*.{kt,kts}]
+max_line_length = 140
+ktlint_code_style = ktlint_official
+ktlint_standard_function-naming = disabled
+# Forces chains like `board.tubes[0].top!!.hidden` onto several lines; hurts readability.
+ktlint_standard_chain-method-continuation = disabled
+ktlint_standard_no-wildcard-imports = enabled
+
+[*.{yml,yaml,nix,json}]
+indent_size = 2

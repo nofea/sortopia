@@ -1,0 +1,41 @@
+# Builds upon detekt's default config (buildUponDefaultConfig = true); only overrides live here.
+complexity:
+  TooManyFunctions:
+    thresholdInFiles: 25
+    thresholdInClasses: 25
+    thresholdInObjects: 25
+    ignorePrivate: true
+  LongParameterList:
+    functionThreshold: 8
+    constructorThreshold: 10
+  LongMethod:
+    threshold: 80
+  CyclomaticComplexMethod:
+    threshold: 20
+  NestedBlockDepth:
+    threshold: 5
+style:
+  MagicNumber:
+    ignoreNumbers: ['-1', '0', '1', '2', '3']
+    # Game tuning tables and layout constants are expected to contain literal numbers.
+    excludes: ['**/test/**', '**/androidTest/**', '**/ui/**', '**/gen/Tuning.kt', '**/render/**']
+  ReturnCount:
+    max: 4
+    excludeGuardClauses: true
+  LoopWithTooManyJumpStatements:
+    maxJumpCount: 2
+  MaxLineLength:
+    maxLineLength: 140
+  UnusedPrivateMember:
+    active: true
+  ForbiddenComment:
+    active: false
+potential-bugs:
+  active: true
+exceptions:
+  TooGenericExceptionCaught:
+    # Save loading must never crash on corrupt input; those catch sites are deliberate.
+    active: true
+    excludes: ['**/save/**', '**/test/**', '**/androidTest/**']
+  SwallowedException:
+    excludes: ['**/save/**']
