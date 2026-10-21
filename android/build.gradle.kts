@@ -21,7 +21,11 @@ fun signingValue(
     prop: String,
 ): String? = providers.environmentVariable(env).orNull?.takeIf { it.isNotEmpty() } ?: keystoreProps.getProperty(prop)
 
-val releaseStoreFile = signingValue("SORTOPIA_KEYSTORE_FILE", "storeFile")
+// A leading "~" means the home directory, as in a shell (Gradle would treat it as a folder name).
+val releaseStoreFile =
+    signingValue("SORTOPIA_KEYSTORE_FILE", "storeFile")?.let {
+        if (it == "~" || it.startsWith("~/")) System.getProperty("user.home") + it.substring(1) else it
+    }
 val releaseStorePassword = signingValue("SORTOPIA_KEYSTORE_PASSWORD", "storePassword")
 val releaseKeyAlias = signingValue("SORTOPIA_KEY_ALIAS", "keyAlias")
 val releaseKeyPassword = signingValue("SORTOPIA_KEY_PASSWORD", "keyPassword")

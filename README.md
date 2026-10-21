@@ -35,8 +35,8 @@ keystore-create   # default: ~/.config/sortopia/upload-keystore.jks, alias "uplo
 Either create `keystore.properties` in the repo root (git-ignored):
 
 ```properties
-# Absolute path, or relative to the repo root. "~" is not expanded.
-storeFile=/home/you/.config/sortopia/upload-keystore.jks
+# Absolute, relative to the repo root, or starting with "~/".
+storeFile=~/.config/sortopia/upload-keystore.jks
 storePassword=...
 keyAlias=upload
 keyPassword=...
