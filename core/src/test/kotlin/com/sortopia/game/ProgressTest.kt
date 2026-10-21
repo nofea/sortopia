@@ -109,6 +109,30 @@ class ProgressTest {
     }
 
     @Test
+    fun `reached endless levels are listed in pages of 20`() {
+        val p = Progress(solved(8))
+        assertEquals(1, EndlessPages.count(p.nextEndless()))
+        assertEquals(1..1, EndlessPages.levels(0, p.nextEndless()))
+        for (n in 1..20) p.recordSolve(LevelId.Endless(n), result(300))
+        // Level 21 is reached (playable) but unsolved, so it opens a second page.
+        val reached = p.nextEndless()
+        assertEquals(2, EndlessPages.count(reached))
+        assertEquals(1..20, EndlessPages.levels(0, reached))
+        assertEquals(21..21, EndlessPages.levels(1, reached))
+        assertEquals(1, EndlessPages.pageOf(21))
+        assertEquals(0, EndlessPages.pageOf(20))
+    }
+
+    @Test
+    fun `next endless level never goes past the last one`() {
+        val data = solved(8)
+        val p = Progress(data.copy(best = data.best + (LevelId.Endless(LevelId.MAX_ENDLESS).key to 1)))
+        val reached = p.nextEndless()
+        assertEquals(LevelId.MAX_ENDLESS, reached)
+        assertEquals(LevelId.MAX_ENDLESS, EndlessPages.levels(EndlessPages.count(reached) - 1, reached).last)
+    }
+
+    @Test
     fun `daily tier is the furthest unlocked world`() {
         assertEquals(1, Progress(SaveData()).furthestWorld())
         assertEquals(4, Progress(solved(3)).furthestWorld())

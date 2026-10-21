@@ -8,6 +8,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextButton
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
 import com.badlogic.gdx.utils.Align
 import com.sortopia.SortopiaGame
+import com.sortopia.game.EndlessPages
 import com.sortopia.gen.Tuning
 import com.sortopia.model.LevelId
 import com.sortopia.save.LoadOutcome
@@ -149,7 +150,7 @@ class WorldMapScreen(
         val subtitle =
             if (unlocked) str("map.endless.info", progress.nextEndless(), progress.endlessTotal()) else str("map.endless.locked")
         return card("endless", str("endless"), subtitle, !unlocked, Theme.endless.accent) {
-            game.go(GameScreen(game, LevelId.Endless(progress.nextEndless())))
+            game.go(EndlessSelectScreen(game))
         }
     }
 
@@ -224,44 +225,38 @@ class WorldMapScreen(
     override fun onBack() = Gdx.app.exit()
 }
 
-class LevelSelectScreen(
+/** A screen with a grid of level cells showing lock state, best stars and best score (SPEC §12). */
+abstract class LevelGridScreen(
     game: SortopiaGame,
-    private val world: Int,
-) : BaseScreen(game, Theme.world(world)) {
-    override val probeName = "levels"
-    private val progress get() = game.progress
+    theme: com.sortopia.ui.WorldTheme,
+) : BaseScreen(game, theme) {
+    protected val progress get() = game.progress
 
-    init {
-        game.audio.playMusic(world)
+    protected fun header(title: String): Table {
         val header = Table()
         header.add(probe("back", ui.button("<") { onBack() })).size(56f)
-        header.add(ui.label(str("select.title", str(theme.nameKey)), "title")).expandX()
+        header.add(ui.label(title, "title")).expandX()
         header.add(ui.coin(24f)).padRight(6f)
         header.add(ui.label(progress.wallet.points.toString()))
-        root.top().pad(12f)
-        root.add(header).expandX().fillX().padBottom(8f).row()
-        root.add(ui.label(str("map.stars", progress.worldStars(world), LevelId.LEVELS_PER_WORLD * 3), "soft")).padBottom(12f).row()
-        val grid = Table()
-        grid.defaults().size(CELL_W, CELL_H).pad(6f)
-        for (l in 1..LevelId.LEVELS_PER_WORLD) {
-            grid.add(levelCell(LevelId.Campaign(world, l)))
-            if (l % COLUMNS == 0) grid.row()
-        }
-        root.add(grid).expand().top()
-        game.prefetch(firstUnsolved())
+        return header
     }
 
-    private fun firstUnsolved(): LevelId.Campaign? =
-        (1..LevelId.LEVELS_PER_WORLD).map { LevelId.Campaign(world, it) }.firstOrNull { !progress.isSolved(it) && progress.isUnlocked(it) }
-
-    private fun levelCell(id: LevelId.Campaign): Table {
+    protected fun levelCell(
+        id: LevelId,
+        text: String,
+    ): Table {
         val unlocked = progress.isUnlocked(id)
-        val button = TextButton(id.level.toString(), assets.skin)
+        val button = TextButton(text, assets.skin)
         button.isDisabled = !unlocked
         button.row()
         if (unlocked) {
             val stars = ui.stars(progress.stars(id), 18f)
-            button.add(stars).size(stars.width, stars.height)
+            button.add(stars).size(stars.width, stars.height).row()
+        }
+        val best = progress.bestScore(id)
+        if (best != null) {
+            button.add(ui.label(str("select.best", best), "small"))
+            game.probe.state("best-${id.key}", best.toString())
         }
         button.addListener(
             object : ClickListener() {
@@ -281,17 +276,99 @@ class LevelSelectScreen(
         if (!game.settings.reduceMotion && unlocked && !progress.isSolved(id)) {
             button.addAction(Actions.forever(Actions.sequence(Actions.alpha(0.75f, 0.8f), Actions.alpha(1f, 0.8f))))
         }
-        probe("level-${id.level}", button)
+        probe("level-$text", button)
         return cell
     }
 
-    override fun onBack() = game.go(WorldMapScreen(game))
+    protected fun grid(): Table = Table().apply { defaults().size(CELL_W, CELL_H).pad(CELL_PAD) }
 
     companion object {
-        private const val COLUMNS = 4
+        const val COLUMNS = 4
         private const val CELL_W = 96f
-        private const val CELL_H = 96f
+        private const val CELL_H = 104f
+        private const val CELL_PAD = 5f
     }
+}
+
+class LevelSelectScreen(
+    game: SortopiaGame,
+    private val world: Int,
+) : LevelGridScreen(game, Theme.world(world)) {
+    override val probeName = "levels"
+
+    init {
+        game.audio.playMusic(world)
+        root.top().pad(12f)
+        root.add(header(str("select.title", str(theme.nameKey)))).expandX().fillX().padBottom(8f).row()
+        root.add(ui.label(str("map.stars", progress.worldStars(world), LevelId.LEVELS_PER_WORLD * 3), "soft")).padBottom(12f).row()
+        val grid = grid()
+        for (l in 1..LevelId.LEVELS_PER_WORLD) {
+            grid.add(levelCell(LevelId.Campaign(world, l), l.toString()))
+            if (l % COLUMNS == 0) grid.row()
+        }
+        root.add(grid).expand().top()
+        game.prefetch(firstUnsolved())
+    }
+
+    private fun firstUnsolved(): LevelId.Campaign? =
+        (1..LevelId.LEVELS_PER_WORLD).map { LevelId.Campaign(world, it) }.firstOrNull { !progress.isSolved(it) && progress.isUnlocked(it) }
+
+    override fun onBack() = game.go(WorldMapScreen(game))
+}
+
+/**
+ * Endless level picker (SPEC §9): continue with the next unsolved level, or replay any level
+ * already reached, [EndlessPages.SIZE] per page.
+ */
+class EndlessSelectScreen(
+    game: SortopiaGame,
+    startPage: Int = EndlessPages.pageOf(game.progress.nextEndless()),
+) : LevelGridScreen(game, Theme.endless) {
+    override val probeName = "endless"
+    private val grid = grid()
+    private val pageLabel = ui.label("", "soft")
+    private val prev = probe("page-prev", ui.button("<") { showPage(this.page - 1) })
+    private val next = probe("page-next", ui.button(">") { showPage(this.page + 1) })
+    private var page = startPage.coerceIn(0, EndlessPages.count(progress.nextEndless()) - 1)
+
+    init {
+        game.audio.playMusic(GameScreen.ENDLESS_TRACK)
+        val nextLevel = progress.nextEndless()
+        root.top().pad(12f)
+        root.add(header(str("endless"))).expandX().fillX().padBottom(8f).row()
+        val play =
+            ui.button(str("endless.continue", nextLevel), "primary") {
+                game.go(GameScreen(game, LevelId.Endless(nextLevel)))
+            }
+        root.add(probe("endless-continue", play)).width(Panels.WIDE_W + 40f).height(Panels.BUTTON_H).row()
+        root.add(ui.label(str("endless.total", progress.endlessTotal()), "soft")).padTop(6f).padBottom(8f).row()
+        root.add(grid).expand().top().row()
+        val pager = Table()
+        pager.add(prev).size(56f)
+        pager.add(pageLabel).expandX()
+        pager.add(next).size(56f)
+        root.add(pager).expandX().fillX().padBottom(8f)
+        showPage(this.page)
+        game.prefetch(LevelId.Endless(nextLevel))
+    }
+
+    private fun showPage(target: Int) {
+        val count = EndlessPages.count(progress.nextEndless())
+        if (target !in 0 until count) return
+        page = target
+        unprobe("level-")
+        grid.clearChildren()
+        for ((i, n) in EndlessPages.levels(page, progress.nextEndless()).withIndex()) {
+            grid.add(levelCell(LevelId.Endless(n), n.toString()))
+            if ((i + 1) % COLUMNS == 0) grid.row()
+        }
+        prev.isDisabled = page == 0
+        next.isDisabled = page == count - 1
+        pageLabel.setText(str("endless.page", page + 1, count))
+        game.probe.state("endless-page", "${page + 1}/$count")
+    }
+
+    override fun onBack() = game.go(WorldMapScreen(game))
 }
 
 class SettingsScreen(

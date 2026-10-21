@@ -9,6 +9,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton
 import com.badlogic.gdx.utils.Align
 import com.sortopia.SortopiaGame
+import com.sortopia.game.EndlessPages
 import com.sortopia.game.GameSession
 import com.sortopia.game.HelperResult
 import com.sortopia.game.Helpers
@@ -512,7 +513,8 @@ class GameScreen(
         game.go(
             when (id) {
                 is LevelId.Campaign -> LevelSelectScreen(game, id.world)
-                else -> WorldMapScreen(game)
+                is LevelId.Endless -> EndlessSelectScreen(game, EndlessPages.pageOf(id.number))
+                is LevelId.Daily -> WorldMapScreen(game)
             },
         )
     }
@@ -639,7 +641,7 @@ class GameScreen(
     companion object {
         const val FLAG_TUTORIAL = "tutorial-done"
         const val FLAG_TIPS = "tips-helpers"
-        private const val ENDLESS_TRACK = 6
+        const val ENDLESS_TRACK = 6
         private const val DAILY_TRACK = 1
         private const val TOAST_TIME = 2.2f
         private const val CONFETTI = 90

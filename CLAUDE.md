@@ -19,7 +19,7 @@ Sortopia is an offline, portrait Android tube-sorting puzzle game.
   - save model and validation
 
   This code must have no LibGDX graphics or Android imports, so it can be unit-tested headless.
-- Platform services (Keystore HMAC key, file storage, haptics, clock) go behind interfaces in `core`. They are implemented in `android` and `desktop`, and faked in tests.
+- Platform services (Keystore HMAC key, file storage, haptics, clock, system font scale) go behind interfaces in `core`. They are implemented in `android` and `desktop`, and faked in tests.
 - The level generator must be **deterministic across devices and app versions**:
   - use a seeded RNG implemented in our own code, never `java.util.Random` or platform RNGs whose behavior may differ
   - never let iteration order of hash-based collections affect output
@@ -52,7 +52,7 @@ All local work happens inside **devenv** ([devenv.sh](https://devenv.sh)). Nothi
 The scripts are not called `test`, because that would shadow the shell builtin.
 
 Other useful commands:
-- Generation survey: `./gradlew :core:test -Dsurvey=true --tests '*GenerationSurvey*'` prints par, attempts and timing for every level.
+- Generation survey: `./gradlew :core:test -Dsurvey=true --tests '*GenerationSurvey*'` prints par, attempts and timing for every level. `SpareSurveyTest` (same flag) is a solver diagnostic for sample big boards. Both are skipped without `-Dsurvey=true`.
 - After changing dependencies:
   - Refresh checksums: `./gradlew --write-verification-metadata sha256 ktlintCheck detekt :core:test :desktop:installDist :android:assembleDebug :android:assembleRelease :android:lintDebug :android:connectedDebugAndroidTest`. This needs the emulator running so the test-runner artifacts get recorded.
   - Refresh the APK lockfile: `./gradlew :android:dependencies --configuration releaseRuntimeClasspath --write-locks`.
@@ -81,7 +81,7 @@ Other useful commands:
   - Tests send real taps through UI Automator and assert on that state, using screenshots where useful.
   - The bridge lives only in the debug source set and must never compile into release.
   - Cover at least: the tutorial, solving a level to completion, helpers spending points, world unlocking, settings toggles, and save/restore across an app restart.
-- A change is done when `lint` and `test` pass. `ui-test` must also pass for changes to screens, input, or persistence.
+- A change is done when `lint` and `unit-test` pass. `ui-test` must also pass for changes to screens, input, or persistence.
 
 ## CI (GitHub Actions)
 - Workflow: `.github/workflows/ci.yml`. All actions are pinned to commit SHAs.
@@ -115,16 +115,17 @@ Other useful commands:
   - `model`, `rules`, `solver`, `gen`, `game`, `save`: pure logic, unit-tested
   - `platform`: interfaces (`Platform`, `UiProbe`)
   - `ui`: LibGDX screens, the board view and rendering
-- `android/src/main`: launcher, `AndroidPlatform`, and `KeystoreMac` (Keystore HMAC key)
+- `core/src/test/kotlin/com/sortopia/`: unit tests, mirroring the logic packages (`TestBoards.kt` holds shared board builders)
+- `android/src/main`: launcher, `AndroidPlatform`, and `KeystoreMac` (Keystore HMAC key, in `AndroidPlatform.kt`)
 - `android/src/debug`: `DebugTestBridge` and its installer. `android/src/release` holds the no-op installer.
 - `android/src/androidTest`: UI Automator tests (`GameDriver` reads the bridge and taps real coordinates)
 - `assets/`: font (Nunito, OFL), `i18n/strings.properties` (all player-facing text), `sfx/`, `music/`
 - `tools/gen_audio.py`: regenerates the placeholder audio deterministically
+- `config/detekt/detekt.yml`: detekt rules (on top of the defaults)
 
 ## Current state / known gaps
 - Art is placeholder: items are procedural shapes with faces (distinct shape + color per type), not per-world illustrated icons (SPEC §13).
 - Audio is synthesized placeholder SFX and music loops (`tools/gen_audio.py`).
 - Generation time: campaign levels take ≤ ~1.5 s on desktop. Some Endless levels take several seconds, so the game prefetches the next level in the background.
-
 ## Git
 - Main branch: `main`. Work on feature branches and open PRs to `main`.

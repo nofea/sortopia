@@ -246,12 +246,13 @@ World 8 and Endless pick their mechanics per level from the seed, at mid-range d
 Splash → World Map ─┬→ Level Select → Gameplay → Level Complete ─┬→ Next level
                     │                     ↕ Pause menu           ├→ Replay
                     ├→ Daily Puzzle → Gameplay                    └→ Level Select
-                    ├→ Endless → Gameplay
+                    ├→ Endless Select → Gameplay
                     └→ Settings
 ```
 
 - **World Map:** the 8 worlds plus Endless. Shows lock state, stars earned per world, stars needed to unlock, the wallet, and the Daily Puzzle entry with streak.
 - **Level Select:** 20 levels per world, with lock state, best stars and best score.
+- **Endless Select:** a Continue button for the next unsolved endless level, the best endless total, and every endless level reached so far (20 per page) with best stars and best score, so any of them can be replayed. Quitting an endless level returns here.
 - **Gameplay HUD:** move counter, par, timer, wallet, and helper buttons (Undo, Hint, Extra tube, Restart) with their costs. Pause button.
 - **Pause menu:** resume, restart, mechanic help card, settings, quit to level select.
 - **Level Complete:** score breakdown (moves vs par, time vs parTime), stars earned (animated), points added to the wallet, new-best indicator, and buttons for Next / Replay / Levels.

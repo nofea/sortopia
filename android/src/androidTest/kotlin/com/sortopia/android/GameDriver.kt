@@ -83,11 +83,25 @@ class GameDriver {
 
     fun tap(id: String) {
         waitUntil("element $id") { DebugTestBridge.bounds(id) != null }
+        scrollIntoView(id)
         val r = DebugTestBridge.bounds(id)
         assertNotNull(r)
         device.click(r!!.centerX(), r.centerY())
         // Let the render thread process the tap before the next step reads state.
         Thread.sleep(TAP_SETTLE_MS)
+    }
+
+    /** Swipes a scrolling list (e.g. the World Map) until [id] is fully on screen. */
+    private fun scrollIntoView(id: String) {
+        repeat(MAX_SCROLLS) {
+            val r = DebugTestBridge.bounds(id) ?: return
+            val h = device.displayHeight
+            if (r.top >= 0 && r.bottom <= h) return
+            val x = device.displayWidth / 2
+            // Drag up to reveal what is below, down to reveal what is above.
+            if (r.bottom > h) device.swipe(x, h * 3 / 4, x, h / 4, SWIPE_STEPS) else device.swipe(x, h / 4, x, h * 3 / 4, SWIPE_STEPS)
+            Thread.sleep(SCROLL_SETTLE_MS)
+        }
     }
 
     /** Waits for a level to be ready and dismisses first-time tips/cards. */
@@ -129,5 +143,8 @@ class GameDriver {
         private const val POLL_MS = 100L
         private const val TAP_SETTLE_MS = 150L
         private const val SCREENSHOT_SETTLE_MS = 700L
+        private const val MAX_SCROLLS = 5
+        private const val SWIPE_STEPS = 20
+        private const val SCROLL_SETTLE_MS = 600L
     }
 }

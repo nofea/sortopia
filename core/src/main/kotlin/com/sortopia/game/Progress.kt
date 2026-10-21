@@ -6,6 +6,25 @@ import com.sortopia.save.SaveData
 import java.time.LocalDate
 import kotlin.math.ceil
 
+/** Pages of the Endless level picker (SPEC §9). [reached] is the highest playable level, [Progress.nextEndless]. */
+object EndlessPages {
+    const val SIZE = 20
+
+    /** The 0-based page that holds endless level [number]. */
+    fun pageOf(number: Int): Int = (number - 1) / SIZE
+
+    fun count(reached: Int): Int = pageOf(reached) + 1
+
+    /** The endless levels on [page], up to [reached]. */
+    fun levels(
+        page: Int,
+        reached: Int,
+    ): IntRange {
+        val first = page * SIZE + 1
+        return first..minOf(first + SIZE - 1, reached)
+    }
+}
+
 /** Result of recording a solved level. */
 data class SolveOutcome(
     val score: Int,
@@ -73,7 +92,8 @@ class Progress(
             .mapNotNull { (LevelId.parse(it) as? LevelId.Endless)?.number }
             .maxOrNull() ?: 0
 
-    fun nextEndless(): Int = highestEndlessSolved() + 1
+    /** The level to continue Endless with; every level up to it is reached and can be replayed (SPEC §9). */
+    fun nextEndless(): Int = (highestEndlessSolved() + 1).coerceAtMost(LevelId.MAX_ENDLESS)
 
     fun endlessTotal(): Int =
         data.best

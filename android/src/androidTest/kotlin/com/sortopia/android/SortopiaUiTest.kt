@@ -101,6 +101,41 @@ class SortopiaUiTest {
     }
 
     @Test
+    fun levelSelectShowsBestScores() {
+        d.seed(SaveData(best = mapOf(LevelId.Campaign(1, 1).key to 87), flags = listOf("tutorial-done", "tips-helpers")))
+        d.launch()
+        d.tap("world-1")
+        d.waitScreen("levels")
+        d.waitUntil("best score shown") { d.state("best-${LevelId.Campaign(1, 1).key}") == "87" }
+        d.screenshot("level-select")
+        assertEquals(null, d.state("best-${LevelId.Campaign(1, 2).key}"))
+    }
+
+    @Test
+    fun endlessPickerReplaysAnEarlierLevel() {
+        val campaign = (1..8).flatMap { w -> (1..20).map { LevelId.Campaign(w, it) } }
+        val endless = (1..21).map { LevelId.Endless(it) }
+        val best = (campaign + endless).associate { it.key to Tuning.basePoints(it) }
+        d.seed(SaveData(best = best, flags = listOf("tutorial-done", "tips-helpers")))
+        d.launch()
+        d.tap("endless")
+        d.waitScreen("endless")
+        // Level 22 is next, so the picker opens on the second page.
+        d.waitUntil("second page") { d.state("endless-page") == "2/2" }
+        d.tap("page-prev")
+        d.waitUntil("first page") { d.state("endless-page") == "1/2" }
+        d.screenshot("endless-picker")
+        d.tap("level-3")
+        d.waitLevelReady()
+        assertEquals(LevelId.Endless(3).key, d.state("level"))
+        d.tap("pause")
+        d.waitOverlay("pause")
+        d.tap("overlay-pause-quit")
+        d.waitScreen("endless")
+        d.waitUntil("back on level 3's page") { d.state("endless-page") == "1/2" }
+    }
+
+    @Test
     fun settingsTogglesArePersisted() {
         d.launch()
         d.tap("settings")
