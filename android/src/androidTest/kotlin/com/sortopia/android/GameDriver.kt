@@ -31,10 +31,19 @@ class GameDriver {
 
     fun readSave(): SaveData = store().load().data
 
-    fun launch() {
+    /** Cold-starts the app and waits for the World Map; [realSplash] keeps the splash's minimum time. */
+    fun launch(realSplash: Boolean = false) {
         DebugTestBridge.reset()
+        DebugTestBridge.fastSplash = !realSplash
         scenario = ActivityScenario.launch(AndroidLauncher::class.java)
         waitScreen("map", LAUNCH_TIMEOUT)
+    }
+
+    /** Cold-starts the app without waiting, so a test can watch the splash. */
+    fun launchToSplash() {
+        DebugTestBridge.reset()
+        DebugTestBridge.fastSplash = false
+        scenario = ActivityScenario.launch(AndroidLauncher::class.java)
     }
 
     /** Sends the app to the background (saving in-progress state) and destroys it. */

@@ -22,6 +22,10 @@ object DebugTestBridge : UiProbe {
 
     override val active: Boolean get() = true
 
+    /** Set by tests; [GameDriver.launch] turns it on unless a test needs the real splash. */
+    @Volatile
+    override var fastSplash: Boolean = false
+
     override fun screen(name: String) {
         currentScreen = name
     }

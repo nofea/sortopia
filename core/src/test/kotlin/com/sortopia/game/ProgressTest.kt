@@ -5,6 +5,7 @@ import com.sortopia.model.LevelId
 import com.sortopia.save.SaveData
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.time.LocalDate
@@ -136,5 +137,20 @@ class ProgressTest {
     fun `daily tier is the furthest unlocked world`() {
         assertEquals(1, Progress(SaveData()).furthestWorld())
         assertEquals(4, Progress(solved(3)).furthestWorld())
+    }
+
+    @Test
+    fun `next campaign level is the first unlocked unsolved one`() {
+        val p = Progress(SaveData())
+        assertEquals(c(1, 1), p.nextCampaign())
+        p.recordSolve(c(1, 1), result(50))
+        assertEquals(c(1, 2), p.nextCampaign())
+        assertEquals(c(2, 1), Progress(solved(1)).nextCampaign())
+    }
+
+    @Test
+    fun `next campaign level is null when the next world is still locked or all are solved`() {
+        assertNull(Progress(solved(1, stars = 1)).nextCampaign())
+        assertNull(Progress(solved(LevelId.WORLDS)).nextCampaign())
     }
 }

@@ -33,6 +33,9 @@ interface UiProbe {
     /** True only for the debug test bridge; screens skip test-only work otherwise. */
     val active: Boolean get() = false
 
+    /** Debug-only UI-test fast path: the splash skips its minimum time (it still waits until ready). */
+    val fastSplash: Boolean get() = false
+
     fun screen(name: String) {}
 
     fun element(

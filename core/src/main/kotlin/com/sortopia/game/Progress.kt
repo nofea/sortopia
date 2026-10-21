@@ -38,6 +38,7 @@ data class SolveOutcome(
  * Progression rules over [SaveData] (SPEC §3.2, §5, §9, §10). Stars are derived from best
  * scores, and unlocks from solved levels, so nothing about them can drift out of sync.
  */
+@Suppress("TooManyFunctions") // One cohesive rule set over SaveData; splitting it would scatter the unlock rules.
 class Progress(
     data: SaveData,
 ) {
@@ -82,6 +83,13 @@ class Progress(
             is LevelId.Endless -> isEndlessUnlocked() && id.number <= nextEndless()
             is LevelId.Daily -> isDailyUnlocked()
         }
+
+    /** The first unlocked campaign level not yet solved, or null if there is none. */
+    fun nextCampaign(): LevelId.Campaign? =
+        (1..LevelId.WORLDS)
+            .asSequence()
+            .flatMap { w -> (1..LevelId.LEVELS_PER_WORLD).asSequence().map { LevelId.Campaign(w, it) } }
+            .firstOrNull { !isSolved(it) && isUnlocked(it) }
 
     fun isEndlessUnlocked(): Boolean = worldFinished(LevelId.WORLDS)
 

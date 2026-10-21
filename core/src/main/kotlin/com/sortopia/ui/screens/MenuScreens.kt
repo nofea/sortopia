@@ -16,38 +16,6 @@ import com.sortopia.ui.Panels
 import com.sortopia.ui.Sfx
 import com.sortopia.ui.ShapeActor
 import com.sortopia.ui.Theme
-import com.sortopia.ui.render.ItemArt
-
-class SplashScreen(
-    game: SortopiaGame,
-) : BaseScreen(game) {
-    override val probeName = "splash"
-    private var elapsed = 0f
-
-    init {
-        val logo =
-            ShapeActor(game) { sr, x, y, w, h ->
-                val types = listOf(0, 4, 5)
-                for ((i, t) in types.withIndex()) {
-                    val cx = x + w * (0.25f + 0.25f * i)
-                    ItemArt.draw(sr, t, cx, y + h / 2 + if (i == 1) 10f else 0f, 56f, false)
-                }
-            }
-        root.add(logo).size(260f, 100f).padBottom(12f).row()
-        root.add(ui.label(str("app.name"), "huge")).row()
-        root.add(ui.label(str("app.tagline"), "soft"))
-        game.prefetch(LevelId.Campaign(1, 1))
-    }
-
-    override fun update(delta: Float) {
-        elapsed += delta
-        if (elapsed > SPLASH_TIME) game.go(WorldMapScreen(game))
-    }
-
-    companion object {
-        private const val SPLASH_TIME = 1.1f
-    }
-}
 
 class WorldMapScreen(
     game: SortopiaGame,

@@ -120,6 +120,22 @@ class SortopiaGame(
         if (id != null && id.key !in cache && id.key !in pending) level(id) {}
     }
 
+    /** Prefetches [ids] and calls [onDone] on the render thread once all of them are generated. */
+    fun prefetchAll(
+        ids: List<LevelId>,
+        onDone: () -> Unit,
+    ) {
+        val distinct = ids.distinctBy { it.key }
+        if (distinct.isEmpty()) {
+            onDone()
+            return
+        }
+        var left = distinct.size
+        for (id in distinct) {
+            level(id) { if (--left == 0) onDone() }
+        }
+    }
+
     override fun pause() {
         super.pause()
         audio.pauseMusic()

@@ -59,6 +59,7 @@ Other useful commands:
 
 ### Environment gotchas
 - devenv's Android module puts the build-tools `lib64` on `LD_LIBRARY_PATH`, which breaks the emulator. `emulator-start` unsets it, so do the same if you run `emulator` by hand.
+- The Nix JDK can't find the host GPU driver's `libGL` (desktop fails with `GLFW_API_UNAVAILABLE` / "Couldn't create window"). `run-desktop` sets `LD_LIBRARY_PATH` to the host GL directories, so do the same if you run `:desktop:run` by hand.
 - LibGDX 1.14 pulls in `androidx.core` 1.17, which requires `compileSdk` 36.
 - Android shows a "Viewing full screen" prompt for immersive apps. `ui-test` disables it with `adb shell settings put secure immersive_mode_confirmations confirmed`.
 

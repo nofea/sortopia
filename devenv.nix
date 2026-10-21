@@ -36,7 +36,16 @@ in
     lint.exec = ''./gradlew --console=plain ktlintCheck detekt :android:lintDebug "$@"'';
     fmt.exec = ''./gradlew --console=plain ktlintFormat "$@"'';
     unit-test.exec = ''./gradlew --console=plain :core:test "$@"'';
-    run-desktop.exec = ''./gradlew --console=plain :desktop:run "$@"'';
+    run-desktop.exec = ''
+      # The Nix JDK doesn't search the host's library dirs, so GLFW can't find the GPU driver's
+      # libGL ("Couldn't create window"). Point it at whichever host driver dirs exist; this also
+      # drops the build-tools lib64 that devenv puts on LD_LIBRARY_PATH.
+      gl=""
+      for d in /run/opengl-driver/lib /usr/lib64 /usr/lib/x86_64-linux-gnu /usr/lib; do
+        [ -e "$d/libGL.so.1" ] || [ -e "$d/libEGL.so.1" ] && gl="''${gl:+$gl:}$d"
+      done
+      LD_LIBRARY_PATH="$gl" ./gradlew --console=plain :desktop:run "$@"
+    '';
     build-debug.exec = ''./gradlew --console=plain :android:assembleDebug "$@"'';
     avd-create.exec = ''
       if avdmanager list avd -c | grep -qx "${avdName}"; then

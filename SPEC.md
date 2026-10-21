@@ -250,6 +250,17 @@ Splash → World Map ─┬→ Level Select → Gameplay → Level Complete ─�
                     └→ Settings
 ```
 
+- **Splash:** shown on a **cold start only** (returning from the background resumes where the player was). It doubles as the loading screen and can't be skipped.
+  - **Animation:** an empty glass tube fills as items of one item type (picked at random each launch) pour in, and the lid seals with a pop. Then "Sortopia" bounces in letter by letter, large and high-contrast, and the tagline fades in below it. The title must stay readable at any system font scale and in the colorblind palette.
+  - **Timing:** the splash ends at the later of **3 s** and **ready**, with a hard cap at **8 s**. Ready means:
+    - the save is loaded and validated, and assets are loaded
+    - the next campaign level is prefetched
+    - the next Endless level is prefetched, if Endless is unlocked
+    - today's Daily Puzzle is prefetched, if the Daily is unlocked
+
+    At the cap the game moves on anyway, and any generation still running continues in the background.
+  - **Waiting past 3 s:** the sealed tube bobs gently, and a subtle "Loading…" with animated dots appears.
+  - On Android 12+, the system launch splash uses the game's background colour and launcher icon, so it hands off to this splash without a colour flash.
 - **World Map:** the 8 worlds plus Endless. Shows lock state, stars earned per world, stars needed to unlock, the wallet, and the Daily Puzzle entry with streak.
 - **Level Select:** 20 levels per world, with lock state, best stars and best score.
 - **Endless Select:** a Continue button for the next unsolved endless level, the best endless total, and every endless level reached so far (20 per page) with best stars and best score, so any of them can be replayed. Quitting an endless level returns here.
@@ -266,7 +277,7 @@ Splash → World Map ─┬→ Level Select → Gameplay → Level Complete ─�
 - **Items:** cute themed icons per world, shown in glass tubes or jars.
 - **Backgrounds:** a light, uncluttered background per world that doesn't compete with the items.
 - **Game feel:** satisfying pour, pop and seal animations; a celebration effect on level completion; subtle idle animations.
-- **Audio:** sound effects for select, pour, illegal move, tube complete, level complete, and helper use. A calm music loop per world.
+- **Audio:** sound effects for select, pour, illegal move, tube complete, level complete, and helper use. A calm music loop per world. The splash reuses the pour and tube-complete sounds and plays no music.
 - **Haptics:** light haptic feedback on pour and tube completion.
 
 ---
@@ -276,7 +287,7 @@ Splash → World Map ─┬→ Level Select → Gameplay → Level Complete ─�
 - **Shapes as well as colors:** every item type has a distinct shape or icon, so the game is colorblind-safe by default.
 - **Colorblind palette:** a toggle for an alternate high-distinction palette.
 - **Audio & haptics:** separate on/off toggles for sound effects, music, and vibration.
-- **Reduce motion:** tones down or skips nonessential animations (celebrations, idle motion). Pours become quick transitions.
+- **Reduce motion:** tones down or skips nonessential animations (celebrations, idle motion). Pours become quick transitions. The splash shows its final frame without motion (at most a quick fade), and its minimum time drops from 3 s to 1 s. It still waits until ready.
 - Touch targets are at least 48dp. Text respects system font scaling where layout allows.
 
 ---

@@ -41,6 +41,20 @@ class SortopiaUiTest {
     }
 
     @Test
+    fun splashShowsTitleThenOpensWorldMap() {
+        val start = System.currentTimeMillis()
+        d.launchToSplash()
+        d.waitScreen("splash")
+        d.waitUntil("title on screen") { DebugTestBridge.bounds("splash-title") != null }
+        d.waitUntil("animation finished") { d.state("splash.animated") == "true" }
+        d.screenshot("splash")
+        d.waitScreen("map", GameDriver.LAUNCH_TIMEOUT)
+        val shown = System.currentTimeMillis() - start
+        assertTrue("splash lasted its 3 s minimum, was $shown ms", shown >= SPLASH_MIN_MS)
+        assertTrue("splash ended by its 8 s cap, was $shown ms", shown <= SPLASH_CAP_MS + SPLASH_SLACK_MS)
+    }
+
+    @Test
     fun tutorialLevelCanBeSolvedAndPaysPoints() {
         d.launch()
         openLevel(1, 1)
@@ -178,5 +192,13 @@ class SortopiaUiTest {
         d.close()
         // No valid backup existed, so the game started fresh with the starting wallet.
         assertEquals(Helpers.STARTING_WALLET, d.readSave().wallet)
+    }
+
+    companion object {
+        private const val SPLASH_MIN_MS = 3_000L
+        private const val SPLASH_CAP_MS = 8_000L
+
+        // App start-up and polling happen outside the splash's own clock.
+        private const val SPLASH_SLACK_MS = 5_000L
     }
 }
