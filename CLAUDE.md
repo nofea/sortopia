@@ -42,6 +42,8 @@ All local work happens inside **devenv** ([devenv.sh](https://devenv.sh)). Nothi
 | `fmt` | ktlint auto-format |
 | `unit-test` | `:core:test`, the headless JUnit 5 suite |
 | `build-debug` | `:android:assembleDebug` |
+| `build-release` | Signed release AAB + APK; fails if signing isn't configured (README, "Release build") |
+| `keystore-create` | Creates the upload keystore (default `~/.config/sortopia/upload-keystore.jks`), never overwrites |
 | `run-desktop` | Runs the desktop launcher (dev only; save in `~/.sortopia`) |
 | `avd-create` | Creates the `sortopia` AVD if it's missing |
 | `emulator-start` | Boots the AVD (pass `-no-window` for headless), waits for boot, disables animations |
@@ -95,6 +97,7 @@ Other useful commands:
   - Gradle wrapper validation
 - **PRs to `main`:** also run the emulator UI tests.
 - CI uses the same devenv environment as local development, for parity.
+- **Release** (`.github/workflows/release.yml`, on a `v*` tag or run by hand): lint, unit tests and `vuln-scan`, then `build-release` with the upload key from repository secrets. Uploads the AAB, APK and R8 mapping. The tag must match `versionName`.
 
 ## Security practices
 - **No secrets in the repo.** Signing keystores, `local.properties` and credentials are git-ignored. Release signing uses CI secrets.

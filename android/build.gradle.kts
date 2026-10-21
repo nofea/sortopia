@@ -1,9 +1,32 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
 }
 
 val natives: Configuration by configurations.creating
+
+// Release signing (README, "Release build"). Each value comes from an environment variable (CI)
+// or else from the git-ignored keystore.properties at the repo root (local). Without them the
+// release build is produced unsigned, so tasks like the checksum refresh still run anywhere.
+val keystoreProps =
+    Properties().apply {
+        val file = rootProject.file("keystore.properties")
+        if (file.isFile) file.inputStream().use { load(it) }
+    }
+
+fun signingValue(
+    env: String,
+    prop: String,
+): String? = providers.environmentVariable(env).orNull?.takeIf { it.isNotEmpty() } ?: keystoreProps.getProperty(prop)
+
+val releaseStoreFile = signingValue("SORTOPIA_KEYSTORE_FILE", "storeFile")
+val releaseStorePassword = signingValue("SORTOPIA_KEYSTORE_PASSWORD", "storePassword")
+val releaseKeyAlias = signingValue("SORTOPIA_KEY_ALIAS", "keyAlias")
+val releaseKeyPassword = signingValue("SORTOPIA_KEY_PASSWORD", "keyPassword")
+val hasReleaseSigning =
+    listOf(releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword).all { it != null }
 
 android {
     namespace = "com.sortopia.android"
@@ -19,8 +42,20 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (hasReleaseSigning) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

@@ -51,6 +51,35 @@ in
       LD_LIBRARY_PATH="$gl" ./gradlew --console=plain :desktop:run "$@"
     '';
     build-debug.exec = ''./gradlew --console=plain :android:assembleDebug "$@"'';
+    # Creates the upload keystore (README, "Release build"). keytool prompts for the passwords and
+    # the certificate name. Refuses to overwrite: losing or replacing the key breaks app updates.
+    keystore-create.exec = ''
+      store="''${1:-$HOME/.config/sortopia/upload-keystore.jks}"
+      if [ -e "$store" ]; then
+        echo "$store already exists; not overwriting it" >&2
+        exit 1
+      fi
+      mkdir -p "$(dirname "$store")"
+      keytool -genkeypair -v -keystore "$store" -storetype PKCS12 -alias upload \
+        -keyalg RSA -keysize 4096 -validity 10000
+      chmod 600 "$store"
+      echo "Created $store (alias: upload). Back it up somewhere safe."
+    '';
+    # Signed release APK + AAB. Fails if signing isn't configured (the Gradle build alone would
+    # produce an unsigned APK) and prints the signing certificate of the result.
+    build-release.exec = ''
+      set -e
+      ./gradlew --console=plain :android:assembleRelease :android:bundleRelease "$@"
+      apk=android/build/outputs/apk/release/android-release.apk
+      aab=android/build/outputs/bundle/release/android-release.aab
+      if [ ! -f "$apk" ]; then
+        echo "No signed APK at $apk: release signing isn't configured (see README, \"Release build\")" >&2
+        exit 1
+      fi
+      "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$apk" | grep -E "Signer #1 certificate (DN|SHA-256)"
+      echo "APK: $apk"
+      echo "AAB: $aab"
+    '';
     avd-create.exec = ''
       if avdmanager list avd -c | grep -qx "${avdName}"; then
         echo "AVD ${avdName} already exists"

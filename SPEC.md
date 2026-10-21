@@ -337,6 +337,7 @@ These requirements shape the game's features and must be kept in all designs.
 - Code shrinking and obfuscation are enabled.
 - Debug-only code, including the UI-test bridge, is **excluded from release builds**.
 - No exported components other than the launcher activity.
+- Signed with an upload key kept outside the repo (Play App Signing holds the app signing key). Signing credentials come from environment variables or a git-ignored `keystore.properties`, never from committed files.
 
 ---
 
