@@ -111,6 +111,28 @@ in
     install-release.exec = ''
       set -euo pipefail
       verify-release
+      if [ -z "''${ANDROID_SERIAL:-}" ]; then
+        # Wireless debugging can list one phone twice (adb connect plus mDNS auto-connect).
+        # Keep one connection per hardware serial so a duplicate doesn't make adb refuse.
+        declare -A seen=()
+        picks=()
+        while read -r conn state _; do
+          [ "$state" = device ] || continue
+          hw=$(adb -s "$conn" shell getprop ro.serialno </dev/null 2>/dev/null | tr -d '\r' || true)
+          hw=''${hw:-$conn}
+          [ -z "''${seen[$hw]:-}" ] || continue
+          seen[$hw]=1
+          picks+=("$conn")
+        done < <(adb devices | tail -n +2)
+        if [ "''${#picks[@]}" -gt 1 ]; then
+          echo "More than one device is connected. Choose one with ANDROID_SERIAL=<serial> install-release:" >&2
+          printf '  %s\n' "''${picks[@]}" >&2
+          exit 1
+        fi
+        if [ "''${#picks[@]}" -eq 1 ]; then
+          export ANDROID_SERIAL="''${picks[0]}"
+        fi
+      fi
       apk=android/build/outputs/apk/release/android-release.apk
       if out=$(adb install -r "$apk" 2>&1); then
         echo "$out"

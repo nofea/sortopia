@@ -96,7 +96,7 @@ Enable USB debugging on the phone (or start the emulator with `emulator-start`),
 install-release
 ```
 
-This verifies the APK, then installs it with `adb install -r`, which updates an existing install and keeps its save. With several devices attached, choose one with `ANDROID_SERIAL=<serial from adb devices> install-release`.
+This verifies the APK, then installs it with `adb install -r`, which updates an existing install and keeps its save. If the same phone shows up twice in `adb devices` (common with wireless debugging), the script uses one of its connections. With several different devices attached, choose one with `ANDROID_SERIAL=<serial from adb devices> install-release`.
 
 If a **debug** build is already installed, the install fails: Android won't update an app with one signed by a different key. The script never uninstalls for you, because uninstalling deletes the save. If losing it is fine, run `adb uninstall com.sortopia` and then `install-release` again.
 
