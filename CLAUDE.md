@@ -59,7 +59,7 @@ The scripts are not called `test`, because that would shadow the shell builtin.
 Other useful commands:
 - Generation survey: `./gradlew :core:test -Dsurvey=true --tests '*GenerationSurvey*'` prints par, attempts and timing for every level. `SpareSurveyTest` (same flag) is a solver diagnostic for sample big boards. Both are skipped without `-Dsurvey=true`.
 - After changing dependencies:
-  - Refresh checksums: `./gradlew --write-verification-metadata sha256 ktlintCheck detekt :core:test :desktop:installDist :android:assembleDebug :android:assembleRelease :android:lintDebug :android:connectedDebugAndroidTest`. This needs the emulator running so the test-runner artifacts get recorded.
+  - Refresh checksums: `GRADLE_USER_HOME=$(mktemp -d) ./gradlew --write-verification-metadata sha256 ktlintCheck detekt :core:test :desktop:installDist :android:assembleDebug :android:assembleRelease :android:lintDebug :android:connectedDebugAndroidTest`. This needs the emulator running so the test-runner artifacts get recorded. The empty `GRADLE_USER_HOME` matters: with a warm cache Gradle skips metadata files it already has (BOM `.module`s, parent POMs), and CI, which starts cold, then fails verification. Copy `~/.gradle/wrapper` into it to skip re-downloading the Gradle distribution.
   - Refresh the APK lockfile: `./gradlew :android:dependencies --configuration releaseRuntimeClasspath --write-locks`.
 
 ### Environment gotchas
