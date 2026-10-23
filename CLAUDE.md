@@ -44,6 +44,7 @@ All local work happens inside **devenv** ([devenv.sh](https://devenv.sh)). Nothi
 | `fmt` | ktlint auto-format |
 | `unit-test` | `:core:test`, the headless JUnit 5 suite |
 | `build-debug` | `:android:assembleDebug` |
+| `clean` | `./gradlew clean`: deletes the build outputs of all modules |
 | `build-release` | Signed release AAB + APK, then `verify-release`; fails if signing isn't configured (README, "Release build") |
 | `verify-release` | Checks the release APK and AAB are signed, by the same key, not the debug key (and by `SORTOPIA_UPLOAD_CERT_SHA256` if set) |
 | `install-release` | Verifies, then sideloads the release APK onto the connected device (`ANDROID_SERIAL` picks one); never uninstalls |

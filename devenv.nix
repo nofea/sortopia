@@ -45,6 +45,7 @@ in
     "unit-test"
     "run-desktop"
     "build-debug"
+    "clean"
     "keystore-create"
     "build-release"
     "verify-release"
