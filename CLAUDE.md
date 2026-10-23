@@ -59,7 +59,9 @@ Each devenv script is a thin wrapper around `scripts/<name>.sh`, where the comma
 Other useful commands:
 - Generation survey: `./gradlew :core:test -Dsurvey=true --tests '*GenerationSurvey*'` prints par, attempts and timing for every level. `SpareSurveyTest` (same flag) is a solver diagnostic for sample big boards. Both are skipped without `-Dsurvey=true`.
 - After changing dependencies:
-  - Refresh checksums: `GRADLE_USER_HOME=$(mktemp -d) ./gradlew --write-verification-metadata sha256 ktlintCheck detekt :core:test :desktop:installDist :android:assembleDebug :android:assembleRelease :android:lintDebug :android:connectedDebugAndroidTest`. This needs the emulator running so the test-runner artifacts get recorded. The empty `GRADLE_USER_HOME` matters: with a warm cache Gradle skips metadata files it already has (BOM `.module`s, parent POMs), and CI, which starts cold, then fails verification. Copy `~/.gradle/wrapper` into it to skip re-downloading the Gradle distribution.
+  - Refresh checksums: `env -u GRADLE_OPTS GRADLE_USER_HOME=$(mktemp -d) ./gradlew --write-verification-metadata sha256 ktlintCheck detekt :core:test :desktop:installDist :android:assembleDebug :android:assembleRelease :android:lintDebug :android:connectedDebugAndroidTest`. This needs the emulator running so the test-runner artifacts get recorded. Both env settings matter, because CI resolves more than a normal local build:
+    - The empty `GRADLE_USER_HOME`: with a warm cache Gradle skips metadata files it already has (BOM `.module`s, parent POMs), and CI, which starts cold, then fails verification. Copy `~/.gradle/wrapper` into it to skip re-downloading the Gradle distribution.
+    - Unsetting `GRADLE_OPTS`: devenv sets `android.aapt2FromMavenOverride` there, so local builds never download aapt2 from Google Maven. CI has no override and does download it.
   - Refresh the APK lockfile: `./gradlew :android:dependencies --configuration releaseRuntimeClasspath --write-locks`.
 
 ### Environment gotchas
