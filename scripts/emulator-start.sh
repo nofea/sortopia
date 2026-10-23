@@ -3,6 +3,8 @@
 # Fails (printing the emulator log) if the emulator exits or doesn't boot within
 # SORTOPIA_BOOT_TIMEOUT seconds (default 600).
 set -euo pipefail
+# Same AVD directory as avd-create.sh, so the emulator finds the AVD it made.
+export ANDROID_AVD_HOME="${ANDROID_AVD_HOME:-${ANDROID_USER_HOME:-$HOME/.android}/avd}"
 "$(dirname "$0")/avd-create.sh"
 log="${TMPDIR:-/tmp}/sortopia-emulator.log"
 timeout="${SORTOPIA_BOOT_TIMEOUT:-600}"
