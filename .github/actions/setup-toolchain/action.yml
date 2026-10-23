@@ -1,0 +1,52 @@
+name: Set up toolchain
+description: >
+  JDK, Android SDK packages and osv-scanner on the plain runner, so the scripts in scripts/ run
+  without devenv. Keep the versions in step with devenv.nix and android/build.gradle.kts.
+
+inputs:
+  gradle-cache:
+    description: Restore and save the Gradle cache ("true"/"false"). Off for jobs that hold secrets.
+    default: "true"
+  emulator:
+    description: Also install the emulator and the system image used by the UI tests.
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      with:
+        distribution: temurin
+        java-version: "17"
+        cache: ${{ inputs.gradle-cache == 'true' && 'gradle' || '' }}
+
+    - name: Android SDK packages
+      shell: bash
+      env:
+        EMULATOR: ${{ inputs.emulator }}
+      run: |
+        # The runner image ships the SDK and its command-line tools; install the exact packages.
+        sdk="$ANDROID_HOME/cmdline-tools/latest/bin"
+        packages=("platforms;android-36" "build-tools;36.0.0" "platform-tools")
+        if [ "$EMULATOR" = true ]; then
+          packages+=("emulator" "system-images;android-36;google_apis;x86_64")
+        fi
+        (yes || true) | "$sdk/sdkmanager" --licenses > /dev/null
+        "$sdk/sdkmanager" --install "${packages[@]}" > /dev/null
+        {
+          echo "$sdk"
+          echo "$ANDROID_HOME/platform-tools"
+          echo "$ANDROID_HOME/emulator"
+        } >> "$GITHUB_PATH"
+
+    - name: osv-scanner
+      shell: bash
+      run: |
+        version=2.5.1
+        sha256=f9f25499a2c8cc367b3af45df2ea7eeca7fbccceab9c35079968f4b3652194be
+        mkdir -p "$RUNNER_TEMP/bin"
+        bin="$RUNNER_TEMP/bin/osv-scanner"
+        curl -fsSL -o "$bin" "https://github.com/google/osv-scanner/releases/download/v$version/osv-scanner_linux_amd64"
+        echo "$sha256  $bin" | sha256sum -c -
+        chmod +x "$bin"
+        echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"

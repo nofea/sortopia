@@ -39,18 +39,17 @@ jobs:
             exit 1
           fi
       - uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
-      - uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
-      - uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+      # No Gradle cache here: this job holds the signing secrets, so it must never restore a cache
+      # that a PR build wrote.
+      - uses: ./.github/actions/setup-toolchain
         with:
-          name: devenv
-      - name: Install devenv
-        run: nix profile install nixpkgs#devenv
+          gradle-cache: "false"
       - name: Lint (ktlint, detekt, Android Lint)
-        run: devenv shell -- lint
+        run: scripts/lint.sh
       - name: Unit tests
-        run: devenv shell -- unit-test
+        run: scripts/unit-test.sh
       - name: Dependency vulnerability scan
-        run: devenv shell -- vuln-scan
+        run: scripts/vuln-scan.sh
       - name: Restore upload keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.SORTOPIA_KEYSTORE_BASE64 }}
@@ -68,7 +67,7 @@ jobs:
           SORTOPIA_KEY_PASSWORD: ${{ secrets.SORTOPIA_KEY_PASSWORD }}
           # Optional repository variable: build-release then checks the APK is signed by this cert.
           SORTOPIA_UPLOAD_CERT_SHA256: ${{ vars.SORTOPIA_UPLOAD_CERT_SHA256 }}
-        run: devenv shell -- build-release
+        run: scripts/build-release.sh
       - name: Remove keystore
         if: always()
         run: rm -f "$RUNNER_TEMP/upload-keystore.jks"

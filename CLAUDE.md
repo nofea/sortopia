@@ -54,7 +54,7 @@ All local work happens inside **devenv** ([devenv.sh](https://devenv.sh)). Nothi
 | `ui-test` | `:android:connectedDebugAndroidTest` on the running emulator |
 | `vuln-scan` | OSV scan: fails on vulnerable **shipped** dependencies (`android/gradle.lockfile`); build tooling is informational only |
 
-The scripts are not called `test`, because that would shadow the shell builtin.
+Each devenv script is a thin wrapper around `scripts/<name>.sh`, where the commands actually live, so CI can run them without devenv. Edit the `.sh` file, not `devenv.nix`. The scripts run from the repo root. They are not called `test`, because that would shadow the shell builtin.
 
 Other useful commands:
 - Generation survey: `./gradlew :core:test -Dsurvey=true --tests '*GenerationSurvey*'` prints par, attempts and timing for every level. `SpareSurveyTest` (same flag) is a solver diagnostic for sample big boards. Both are skipped without `-Dsurvey=true`.
@@ -98,7 +98,10 @@ Other useful commands:
   - dependency vulnerability scan (`vuln-scan`, OSV)
   - Gradle wrapper validation
 - **PRs to `main`:** also run the emulator UI tests.
-- CI uses the same devenv environment as local development, for parity.
+- CI does **not** use devenv. Jobs run on the plain `ubuntu-latest` runner and call the same `scripts/*.sh` as the devenv commands, for parity.
+  - `.github/actions/setup-toolchain` installs JDK 17 (Temurin), the Android SDK packages (platform 36, build-tools 36.0.0, platform tools; the emulator and system image for UI tests) and osv-scanner (a pinned release binary, SHA-256 checked).
+  - These versions must match `devenv.nix` and `android/build.gradle.kts`: change them together.
+  - The Gradle cache is used in `ci.yml` and disabled in the release `build` job, so a PR build can never seed the job holding the signing secrets.
 - **Release** (`.github/workflows/release.yml`, on a `v*` tag or run by hand):
   - `build` job (read-only, the only job with the signing secrets): lint, unit tests and `vuln-scan`, then `build-release` with the upload key from repository secrets.
   - On a tag, `build` first checks that the tagged commit is on `main` and that the tag matches `versionName`.
@@ -134,6 +137,8 @@ Other useful commands:
 - `tools/gen_audio.py`: regenerates the placeholder audio deterministically
 - `tools/gen_icon.py`: generates the launcher icon drawables (`ic_launcher_*.xml`) and `store/` (`icon.svg`, `icon-512.png` for Play, `icon-preview.png` showing masks and themed icons). Edit the script, not the generated files.
 - `config/detekt/detekt.yml`: detekt rules (on top of the defaults)
+- `scripts/`: the dev, build, release and emulator commands (devenv wraps them; CI calls them directly)
+- `.github/actions/setup-toolchain`: the CI toolchain setup (no devenv in CI)
 
 ## Current state / known gaps
 - Art is placeholder: items are procedural shapes with faces (distinct shape + color per type), not per-world illustrated icons (SPEC §13).
@@ -141,3 +146,4 @@ Other useful commands:
 - Generation time: campaign levels take ≤ ~1.5 s on desktop. Some Endless levels take several seconds, so the game prefetches the next level in the background.
 ## Git
 - Main branch: `main`. Work on feature branches and open PRs to `main`.
+- **Never commit (or push) without the user's explicit say-so for that commit.** Approval of a plan, "proceed", or auto mode is not permission to commit. Leave changes uncommitted and say they're ready for review.
