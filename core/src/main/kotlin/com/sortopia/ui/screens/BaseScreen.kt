@@ -33,7 +33,9 @@ abstract class BaseScreen(
 ) : ScreenAdapter() {
     protected val stage = Stage(ExtendViewport(VIRTUAL_WIDTH, VIRTUAL_HEIGHT), game.batch)
     protected val ui = Widgets(game)
-    protected val root = Table().apply { setFillParent(true) }
+
+    /** Screen content, kept inside the display's safe area (see [applySafeArea]). */
+    protected val root = Table()
     protected val assets get() = game.assets
 
     protected fun str(
@@ -45,6 +47,13 @@ abstract class BaseScreen(
     private var overlay: Table? = null
     protected val hasOverlay: Boolean get() = overlay != null
     private var time = 0f
+
+    // The display's safe-area insets, in pixels as last applied and in world units.
+    private var insets = Insets(-1, -1, -1, -1)
+    private var safeLeft = 0f
+    private var safeTop = 0f
+    private var safeRight = 0f
+    private var safeBottom = 0f
 
     abstract val probeName: String
 
@@ -76,12 +85,44 @@ abstract class BaseScreen(
         height: Int,
     ) {
         stage.viewport.update(width, height, true)
+        insets = Insets(-1, -1, -1, -1)
+        applySafeArea()
     }
+
+    /**
+     * The world background fills the whole screen, but [root] and overlay content stay clear of
+     * camera cutouts and rounded corners: the app targets Android 15+, which draws it edge to edge.
+     * Insets can arrive after the first resize, so this re-checks every frame and only relayouts on
+     * a change.
+     */
+    private fun applySafeArea() {
+        val g = Gdx.graphics
+        val now = Insets(g.safeInsetLeft, g.safeInsetTop, g.safeInsetRight, g.safeInsetBottom)
+        if (now == insets) return
+        insets = now
+        val vp = stage.viewport
+        val sx = vp.worldWidth / vp.screenWidth.coerceAtLeast(1)
+        val sy = vp.worldHeight / vp.screenHeight.coerceAtLeast(1)
+        safeLeft = now.left * sx
+        safeTop = now.top * sy
+        safeRight = now.right * sx
+        safeBottom = now.bottom * sy
+        root.setBounds(safeLeft, safeBottom, vp.worldWidth - safeLeft - safeRight, vp.worldHeight - safeTop - safeBottom)
+        overlay?.pad(safeTop, safeLeft, safeBottom, safeRight)
+    }
+
+    private data class Insets(
+        val left: Int,
+        val top: Int,
+        val right: Int,
+        val bottom: Int,
+    )
 
     override fun render(delta: Float) {
         time += delta
         Gdx.gl.glClearColor(theme.backgroundBottom.r, theme.backgroundBottom.g, theme.backgroundBottom.b, 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
+        applySafeArea()
         drawBackground()
         update(delta)
         stage.act(delta)
@@ -202,6 +243,7 @@ abstract class BaseScreen(
                 background = assets.solid(DIM)
                 touchable = Touchable.enabled
                 this.name = name
+                pad(safeTop, safeLeft, safeBottom, safeRight)
                 add(content).width(VIRTUAL_WIDTH - 48f)
             }
         if (!game.settings.reduceMotion) {
