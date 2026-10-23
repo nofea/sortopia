@@ -99,7 +99,11 @@ Other useful commands:
   - Gradle wrapper validation
 - **PRs to `main`:** also run the emulator UI tests.
 - CI uses the same devenv environment as local development, for parity.
-- **Release** (`.github/workflows/release.yml`, on a `v*` tag or run by hand): lint, unit tests and `vuln-scan`, then `build-release` with the upload key from repository secrets. Uploads the AAB, APK and R8 mapping. The tag must match `versionName`.
+- **Release** (`.github/workflows/release.yml`, on a `v*` tag or run by hand):
+  - `build` job (read-only, the only job with the signing secrets): lint, unit tests and `vuln-scan`, then `build-release` with the upload key from repository secrets.
+  - On a tag, `build` first checks that the tagged commit is on `main` and that the tag matches `versionName`.
+  - `publish` job (tags only; `contents: write`, no secrets): creates a GitHub Release with auto-generated notes. It attaches `sortopia-<tag>.apk`, `.aab` and `-mapping.txt`, marks `v0.*` as a pre-release, and fails rather than overwrite an existing release.
+  - A manual run only builds, keeping a 7-day workflow artifact and never creating a release.
 
 ## Security practices
 - **No secrets in the repo.** Signing keystores, `local.properties` and credentials are git-ignored. Release signing uses CI secrets.

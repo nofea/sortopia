@@ -102,7 +102,16 @@ If a **debug** build is already installed, the install fails: Android won't upda
 
 ### Releasing from CI
 
-`.github/workflows/release.yml` makes the same signed build on GitHub Actions. It runs lint, unit tests and the vulnerability scan first, then uploads the AAB, the APK and the R8 `mapping.txt` (needed to read obfuscated crash stack traces) as a workflow artifact.
+`.github/workflows/release.yml` makes the same signed build on GitHub Actions and publishes it as a **GitHub Release**. It has two jobs:
+
+- **build** runs lint, unit tests and the vulnerability scan, then `build-release`. It's the only job with the signing secrets, and it has read-only access to the repo.
+- **publish** creates the GitHub Release. It runs only for tags, can write to the repo, and never sees the secrets.
+
+The release has these files attached:
+
+- `sortopia-<tag>.apk`: for sideloading
+- `sortopia-<tag>.aab`: upload this to Google Play
+- `sortopia-<tag>-mapping.txt`: the R8 mapping for this exact build. You need it to read obfuscated crash stack traces (`retrace`, or upload it to Play Console). Every build has its own mapping, so keeping it on the release means it never gets lost.
 
 One-time setup: add these repository secrets (**Settings → Secrets and variables → Actions**):
 
@@ -115,10 +124,23 @@ One-time setup: add these repository secrets (**Settings → Secrets and variabl
 
 Optionally, add the upload certificate's SHA-256 as a repository **variable** (Variables tab, not Secrets) named `SORTOPIA_UPLOAD_CERT_SHA256`. The build then fails unless it was signed by that key.
 
-To release, bump `versionCode` and `versionName`, merge to `main`, then push a matching tag:
+To release, bump `versionCode` and `versionName`, merge to `main`, then tag a commit on `main` and push the tag:
 
 ```sh
+git switch main && git pull
 git tag v0.1.0 && git push origin v0.1.0
 ```
 
-The job fails if the tag doesn't match `versionName`. You can also start it by hand from the Actions tab (**Release → Run workflow**), which skips the tag check. Download the result from the run's **Artifacts** section.
+Before the slow steps, the build fails if:
+
+- the tagged commit isn't on `main` (for example, you tagged a feature branch)
+- the tag doesn't match `versionName`
+
+If it all passes, the release is published right away, under **Releases** on GitHub:
+
+- its notes are generated from the PRs and commits since the previous tag
+- `v0.*` tags are marked as **pre-releases**, and `v1.0.0` onwards are normal releases
+
+The publish job never overwrites a release. If a release for the tag already exists, for example because an earlier run created it and then failed while uploading files, the job fails. Delete that release on GitHub (keep the tag), then re-run the job.
+
+You can also start the workflow by hand from the Actions tab (**Release → Run workflow**). A manual run builds and verifies the signed APK and AAB, but skips the tag checks and **never creates a release**. Download its files from the run's **Artifacts** section. They are named after the branch and kept for 7 days.
