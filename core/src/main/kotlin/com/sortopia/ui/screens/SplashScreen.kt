@@ -1,9 +1,12 @@
 package com.sortopia.ui.screens
 
-import com.badlogic.gdx.graphics.Color
+import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.graphics.GL20
+import com.badlogic.gdx.graphics.g2d.Batch
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer
 import com.badlogic.gdx.math.Interpolation
 import com.badlogic.gdx.math.MathUtils
+import com.badlogic.gdx.math.Rectangle
 import com.badlogic.gdx.scenes.scene2d.Actor
 import com.badlogic.gdx.scenes.scene2d.actions.Actions
 import com.badlogic.gdx.scenes.scene2d.ui.Container
@@ -12,15 +15,15 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table
 import com.sortopia.SortopiaGame
 import com.sortopia.game.SplashTiming
 import com.sortopia.model.LevelId
+import com.sortopia.theme.Look
 import com.sortopia.ui.Sfx
-import com.sortopia.ui.ShapeActor
 import com.sortopia.ui.Theme
 import com.sortopia.ui.render.ItemArt
-import com.sortopia.ui.render.Shapes
+import com.sortopia.ui.render.TubeArt
 import kotlin.math.sin
 
 /**
- * Cold-start splash and loading screen (SPEC §12): items of one random type pour into a tube,
+ * Cold-start splash and loading screen (SPEC §12): items of one random world's item pour into its tube,
  * the lid seals, and the title bounces in. It stays until the levels the player is likely to
  * open next are generated, within [SplashTiming]'s minimum and cap.
  */
@@ -31,7 +34,9 @@ class SplashScreen(
     private val motion = !game.settings.reduceMotion
     private val colorblind = game.settings.colorblindPalette
     private val minimum = SplashTiming.minimum(game.settings.reduceMotion, game.probe.fastSplash)
-    private val itemType = MathUtils.random(ItemArt.SHAPES - 1)
+    private val tubeTheme = Theme.worlds[MathUtils.random(Theme.worlds.size - 1)]
+    private val look = Look(tubeTheme.def, tubeTheme.def.items)
+    private val itemType = MathUtils.random(look.items.size - 1)
     private var elapsed = if (motion) 0f else ANIMATION_END
     private var waited = 0f
     private var ready = false
@@ -39,7 +44,7 @@ class SplashScreen(
     private val loading = ui.label("", "soft")
 
     init {
-        root.add(ShapeActor(game, ::drawTube)).size(TUBE_W, TUBE_H + LID_SPACE).padBottom(28f).row()
+        root.add(TubeActor()).size(TUBE_W, TUBE_H + LID_SPACE).padBottom(28f).row()
         root.add(title()).row()
         root.add(fadeIn(ui.label(str("app.tagline"), "soft"), TAGLINE_AT)).padTop(6f).row()
         root.add(loading).padTop(28f).height(loading.prefHeight)
@@ -138,44 +143,43 @@ class SplashScreen(
         length: Float,
     ) = ((elapsed - start) / length).coerceIn(0f, 1f)
 
-    private fun drawTube(
-        sr: ShapeRenderer,
-        x: Float,
-        y: Float,
-        w: Float,
-        h: Float,
-    ) {
-        val bob = if (motion && elapsed > ANIMATION_END) sin((elapsed - ANIMATION_END) * BOB_SPEED) * BOB_HEIGHT else 0f
-        val ty = y + bob
-        val th = h - LID_SPACE
-        val radius = w / 2
-        sr.color = Theme.shadow
-        Shapes.tubeBody(sr, x + 3, ty - 4, w, th, radius)
-        sr.color = Theme.glassEdge
-        Shapes.tubeBody(sr, x, ty, w, th, radius)
-        sr.color = Theme.glass
-        Shapes.tubeBody(sr, x + 3, ty + 3, w - 6, th - 3, radius - 3)
+    /** The splash tube: a random world's glass and lid, filling with one of its items (SPEC §12). */
+    private inner class TubeActor : Actor() {
+        private val glass = Rectangle()
 
-        val cx = x + w / 2
-        val slot = (th - TUBE_PAD * 2) / CAPACITY
-        for (i in 0 until CAPACITY) {
-            val p = phase(itemStart(i), DROP_TIME)
-            if (p <= 0f) continue
-            val target = ty + TUBE_PAD + slot * (i + 0.5f)
-            val cy = MathUtils.lerp(y + h + ITEM_SIZE, target, Interpolation.bounceOut.apply(p))
-            ItemArt.draw(sr, itemType, cx, cy, ITEM_SIZE, colorblind)
-        }
-        sr.color = SHINE
-        sr.rect(x + w * 0.18f, ty + th * 0.2f, w * 0.1f, th * 0.7f)
-
-        val lid = phase(LID_AT, LID_TIME)
-        if (lid > 0f) {
-            val drop = (1f - Interpolation.bounceOut.apply(lid)) * LID_SPACE * 2
-            val color = Theme.itemColor(itemType, colorblind)
-            sr.color = Shapes.shade(color, 0.3f)
-            Shapes.roundedRect(sr, x - 4, ty + th - 2 + drop, w + 8, ITEM_SIZE * 0.32f, ITEM_SIZE * 0.12f)
-            sr.color = Shapes.tint(color, 0.15f)
-            Shapes.roundedRect(sr, x - 4, ty + th + 1 + drop, w + 8, ITEM_SIZE * 0.27f, ITEM_SIZE * 0.12f)
+        override fun draw(
+            batch: Batch,
+            parentAlpha: Float,
+        ) {
+            val bob = if (motion && elapsed > ANIMATION_END) sin((elapsed - ANIMATION_END) * BOB_SPEED) * BOB_HEIGHT else 0f
+            glass.set(x, y + bob, width, height - LID_SPACE)
+            batch.end()
+            Gdx.gl.glEnable(GL20.GL_BLEND)
+            val sr = game.shapes
+            sr.projectionMatrix = batch.projectionMatrix
+            sr.transformMatrix = batch.transformMatrix
+            sr.begin(ShapeRenderer.ShapeType.Filled)
+            TubeArt.glass(sr, tubeTheme, glass, elapsed, motion)
+            sr.end()
+            batch.begin()
+            val art = game.assets.art
+            TubeArt.base(batch, art, tubeTheme, glass)
+            val cx = glass.x + glass.width / 2
+            val slot = (glass.height - TUBE_PAD * 2) / CAPACITY
+            for (i in 0 until CAPACITY) {
+                val p = phase(itemStart(i), DROP_TIME)
+                if (p <= 0f) continue
+                val target = glass.y + TUBE_PAD + slot * (i + 0.5f)
+                val cy = MathUtils.lerp(y + height + ITEM_SIZE, target, Interpolation.bounceOut.apply(p))
+                ItemArt.draw(batch, art, look, itemType, cx, cy, ITEM_SIZE, colorblind, alpha = parentAlpha)
+            }
+            TubeArt.shine(batch, game.assets.white, glass)
+            TubeArt.collar(batch, art, tubeTheme, glass, slot)
+            val lid = phase(LID_AT, LID_TIME)
+            if (lid > 0f) {
+                val drop = (1f - Interpolation.bounceOut.apply(lid)) * LID_SPACE * 2
+                TubeArt.lid(batch, art, tubeTheme, glass, drop, ItemArt.color(look, itemType, colorblind))
+            }
         }
     }
 
@@ -185,7 +189,7 @@ class SplashScreen(
         private const val TUBE_H = 280f
         private const val TUBE_PAD = 6f
         private const val LID_SPACE = 24f
-        private const val ITEM_SIZE = 60f
+        private const val ITEM_SIZE = 68f
 
         // Animation timeline, in seconds; it ends just before SplashTiming.MIN_SECONDS.
         private const val FIRST_ITEM_AT = 0.3f
@@ -206,6 +210,5 @@ class SplashScreen(
         private const val BOB_HEIGHT = 4f
         private const val DOTS_PER_SECOND = 2.5f
         private const val MAX_DOTS = 3
-        private val SHINE = Color(1f, 1f, 1f, 0.35f)
     }
 }

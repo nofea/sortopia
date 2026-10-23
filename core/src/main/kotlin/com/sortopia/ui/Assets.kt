@@ -18,10 +18,12 @@ import com.badlogic.gdx.scenes.scene2d.utils.Drawable
 import com.badlogic.gdx.scenes.scene2d.utils.NinePatchDrawable
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable
 import com.badlogic.gdx.utils.Disposable
+import com.badlogic.gdx.utils.GdxRuntimeException
 import com.badlogic.gdx.utils.I18NBundle
 import com.sortopia.platform.Haptic
 import com.sortopia.platform.Platform
 import com.sortopia.save.Settings
+import com.sortopia.ui.render.ArtAtlas
 
 /** Fonts, the programmatic UI skin and localized strings. */
 class Assets(
@@ -45,6 +47,13 @@ class Assets(
     private val roundTexture: Texture = roundedTexture()
 
     val skin: Skin = buildSkin()
+
+    val art: ArtAtlas = ArtAtlas()
+    private val accentStyles = HashMap<Int, TextButton.TextButtonStyle>()
+
+    /** A pale button in a world's [accent] colour (SPEC §13: themed UI accents). */
+    fun accentStyle(accent: Color): TextButton.TextButtonStyle =
+        accentStyles.getOrPut(Color.rgba8888(accent)) { buttonStyle(Color(accent).lerp(Color.WHITE, ACCENT_PALE), Theme.ink) }
 
     fun str(
         key: String,
@@ -141,6 +150,7 @@ class Assets(
         pixel.dispose()
         roundTexture.dispose()
         skin.dispose()
+        art.dispose()
     }
 
     companion object {
@@ -152,6 +162,7 @@ class Assets(
         private const val ROUND_RADIUS = 30
         private const val PAD = 18f
         private const val PAD_V = 12f
+        private const val ACCENT_PALE = 0.62f
     }
 }
 
@@ -184,17 +195,27 @@ class Audio(
         if (settings().haptics) platform.haptic(kind)
     }
 
-    /** Switches to music track [track] (1..8); no-op if it's already playing. */
-    fun playMusic(track: Int) {
-        val file = "music/world$track.wav"
+    /** Switches to music [track] (a world's or the menu's, SPEC §13); no-op if it's already playing. */
+    fun playMusic(track: String) {
+        val file = "music/$track.$MUSIC_EXT"
         if (file != musicFile) {
             music?.dispose()
-            music =
-                Gdx.audio.newMusic(Gdx.files.internal(file)).apply {
-                    isLooping = true
-                    volume = MUSIC_VOLUME
-                }
+            music = null
             musicFile = file
+            // A missing or unreadable track only means silence, never a crash.
+            val handle = Gdx.files.internal(file)
+            if (handle.exists()) {
+                music =
+                    try {
+                        Gdx.audio.newMusic(handle).apply {
+                            isLooping = true
+                            volume = MUSIC_VOLUME
+                        }
+                    } catch (e: GdxRuntimeException) {
+                        Gdx.app.error("Sortopia", "Music unavailable: ${e.javaClass.simpleName}")
+                        null
+                    }
+            }
         }
         refreshMusic()
     }
@@ -220,5 +241,6 @@ class Audio(
     companion object {
         private const val SFX_VOLUME = 0.7f
         private const val MUSIC_VOLUME = 0.35f
+        private const val MUSIC_EXT = "ogg"
     }
 }

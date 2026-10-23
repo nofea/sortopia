@@ -100,6 +100,15 @@ class GameDriver {
         Thread.sleep(TAP_SETTLE_MS)
     }
 
+    /** Taps raw screen coordinates, e.g. between two tubes. */
+    fun tapAt(
+        x: Int,
+        y: Int,
+    ) {
+        device.click(x, y)
+        Thread.sleep(TAP_SETTLE_MS)
+    }
+
     /** Swipes a scrolling list (e.g. the World Map) until [id] is fully on screen. */
     private fun scrollIntoView(id: String) {
         repeat(MAX_SCROLLS) {

@@ -12,10 +12,12 @@ import com.sortopia.game.EndlessPages
 import com.sortopia.gen.Tuning
 import com.sortopia.model.LevelId
 import com.sortopia.save.LoadOutcome
+import com.sortopia.theme.ThemeCatalog
 import com.sortopia.ui.Panels
 import com.sortopia.ui.Sfx
 import com.sortopia.ui.ShapeActor
 import com.sortopia.ui.Theme
+import com.sortopia.ui.WorldTheme
 
 class WorldMapScreen(
     game: SortopiaGame,
@@ -24,7 +26,7 @@ class WorldMapScreen(
     private val progress get() = game.progress
 
     init {
-        game.audio.playMusic(1)
+        game.audio.playMusic(ThemeCatalog.MENU_TRACK)
         val header = Table()
         header.add(ui.label(str("map.title"), "title")).expandX().left()
         header.add(ui.coin(24f)).padRight(6f)
@@ -62,6 +64,7 @@ class WorldMapScreen(
         subtitle: String,
         locked: Boolean,
         accent: com.badlogic.gdx.graphics.Color,
+        emblem: WorldTheme? = null,
         onOpen: () -> Unit,
     ): Table {
         val t = ui.panel(if (locked) Theme.locked else Theme.paper)
@@ -75,6 +78,11 @@ class WorldMapScreen(
         text.add(ui.label(title, "title", align = Align.left)).expandX().fillX().row()
         text.add(ui.label(subtitle, "soft", wrap = true, align = Align.left)).expandX().fillX()
         t.add(text).expandX().fillX()
+        if (emblem != null) {
+            val icon = ui.emblem(emblem, CARD_EMBLEM)
+            if (locked) icon.color.a = LOCKED_ALPHA
+            t.add(icon).size(CARD_EMBLEM).padLeft(8f)
+        }
         t.touchable = com.badlogic.gdx.scenes.scene2d.Touchable.enabled
         t.addListener(
             object : ClickListener() {
@@ -108,7 +116,7 @@ class WorldMapScreen(
                 else -> str("map.locked.stars", progress.starsMissingFor(w))
             }
         val theme = Theme.world(w)
-        return card("world-$w", "$w. ${str(theme.nameKey)}", subtitle, !unlocked, theme.accent) {
+        return card("world-$w", "$w. ${str(theme.nameKey)}", subtitle, !unlocked, theme.accent, theme) {
             game.go(LevelSelectScreen(game, w))
         }
     }
@@ -131,7 +139,7 @@ class WorldMapScreen(
                 progress.isDailyClaimed(today) -> str("map.daily.done") + "\n" + str("map.daily.streak", progress.dailyStreak(today))
                 else -> str("map.daily.new") + "\n" + str("map.daily.streak", progress.dailyStreak(today))
             }
-        return card("daily", str("daily"), subtitle, !unlocked, Theme.daily.accent) {
+        return card("daily", str("daily"), subtitle, !unlocked, Theme.dailyAccent) {
             game.go(GameScreen(game, progress.dailyFor(today)))
         }
     }
@@ -191,19 +199,27 @@ class WorldMapScreen(
     }
 
     override fun onBack() = Gdx.app.exit()
+
+    private companion object {
+        const val CARD_EMBLEM = 48f
+        const val LOCKED_ALPHA = 0.45f
+    }
 }
 
 /** A screen with a grid of level cells showing lock state, best stars and best score (SPEC §12). */
 abstract class LevelGridScreen(
     game: SortopiaGame,
-    theme: com.sortopia.ui.WorldTheme,
+    theme: WorldTheme,
 ) : BaseScreen(game, theme) {
     protected val progress get() = game.progress
 
     protected fun header(title: String): Table {
         val header = Table()
-        header.add(probe("back", ui.button("<") { onBack() })).size(56f)
-        header.add(ui.label(title, "title")).expandX()
+        header.add(probe("back", ui.button("<") { onBack() }.apply { style = assets.accentStyle(theme.accent) })).size(56f)
+        val name = Table()
+        name.add(ui.emblem(theme, EMBLEM)).size(EMBLEM).padRight(6f)
+        name.add(ui.label(title, "title"))
+        header.add(name).expandX()
         header.add(ui.coin(24f)).padRight(6f)
         header.add(ui.label(progress.wallet.points.toString()))
         return header
@@ -214,7 +230,7 @@ abstract class LevelGridScreen(
         text: String,
     ): Table {
         val unlocked = progress.isUnlocked(id)
-        val button = TextButton(text, assets.skin)
+        val button = TextButton(text, assets.accentStyle(theme.accent))
         button.isDisabled = !unlocked
         button.row()
         if (unlocked) {
@@ -252,6 +268,7 @@ abstract class LevelGridScreen(
 
     companion object {
         const val COLUMNS = 4
+        private const val EMBLEM = 34f
         private const val CELL_W = 96f
         private const val CELL_H = 104f
         private const val CELL_PAD = 5f
@@ -265,7 +282,7 @@ class LevelSelectScreen(
     override val probeName = "levels"
 
     init {
-        game.audio.playMusic(world)
+        game.audio.playMusic(theme.def.track)
         root.top().pad(12f)
         root.add(header(str("select.title", str(theme.nameKey)))).expandX().fillX().padBottom(8f).row()
         root.add(ui.label(str("map.stars", progress.worldStars(world), LevelId.LEVELS_PER_WORLD * 3), "soft")).padBottom(12f).row()
@@ -300,7 +317,7 @@ class EndlessSelectScreen(
     private var page = startPage.coerceIn(0, EndlessPages.count(progress.nextEndless()) - 1)
 
     init {
-        game.audio.playMusic(GameScreen.ENDLESS_TRACK)
+        game.audio.playMusic(ThemeCatalog.MENU_TRACK)
         val nextLevel = progress.nextEndless()
         root.top().pad(12f)
         root.add(header(str("endless"))).expandX().fillX().padBottom(8f).row()

@@ -9,19 +9,22 @@ import com.badlogic.gdx.graphics.g2d.GlyphLayout
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer
 import com.badlogic.gdx.math.Interpolation
 import com.badlogic.gdx.math.MathUtils
+import com.badlogic.gdx.math.Matrix4
 import com.badlogic.gdx.math.Rectangle
 import com.badlogic.gdx.scenes.scene2d.Actor
 import com.badlogic.gdx.scenes.scene2d.InputEvent
 import com.badlogic.gdx.scenes.scene2d.InputListener
 import com.sortopia.SortopiaGame
+import com.sortopia.layout.BoardLayout
 import com.sortopia.model.Board
 import com.sortopia.model.Item
 import com.sortopia.model.Move
 import com.sortopia.model.Tube
 import com.sortopia.rules.Rules
+import com.sortopia.theme.Look
 import com.sortopia.ui.render.ItemArt
 import com.sortopia.ui.render.Shapes
-import kotlin.math.ceil
+import com.sortopia.ui.render.TubeArt
 import kotlin.math.sin
 
 /**
@@ -30,6 +33,8 @@ import kotlin.math.sin
  */
 class BoardView(
     private val game: SortopiaGame,
+    var theme: WorldTheme = Theme.endless,
+    var look: Look = Look(theme.def, theme.def.items),
     private val onTubeTapped: (Int) -> Unit,
 ) : Actor() {
     var board: Board = Board(emptyList())
@@ -43,8 +48,12 @@ class BoardView(
     var hint: Move? = null
     var pointer: Int? = null
 
-    /** Tap target for each tube, in local coordinates (the whole column, not just the glass). */
+    /**
+     * Tap target for each tube, in local coordinates. The cells tile the whole board, so a tap
+     * always goes to the nearest tube in its row (SPEC §14).
+     */
     val hitRects = ArrayList<Rectangle>()
+    private var layout = BoardLayout.compute(0f, 0f, emptyList())
     private val tubeRects = ArrayList<Rectangle>()
     private var itemSize = 40f
     private var pad = 5f
@@ -55,6 +64,9 @@ class BoardView(
     private val flights = ArrayList<Flight>()
     private var time = 0f
     private val glyphs = GlyphLayout()
+    private val tmpRect = Rectangle()
+    private val tmpMatrix = Matrix4()
+    private val tmpMatrix2 = Matrix4()
     private val texts = ArrayList<TextDraw>()
 
     private class Flight(
@@ -87,9 +99,9 @@ class BoardView(
                     pointer: Int,
                     button: Int,
                 ): Boolean {
-                    val index = hitRects.indexOfFirst { it.contains(x, y) }
-                    if (index >= 0) onTubeTapped(index)
-                    return index >= 0
+                    val index = layout.tubeAt(x, y) ?: return false
+                    onTubeTapped(index)
+                    return true
                 }
             },
         )
@@ -131,44 +143,14 @@ class BoardView(
     }
 
     private fun layoutTubes() {
+        layout = BoardLayout.compute(width, height, board.tubes.map { it.capacity })
         tubeRects.clear()
         hitRects.clear()
-        val tubes = board.tubes
-        val n = tubes.size
-        if (n == 0 || width <= 0f || height <= 0f) return
-        val rows =
-            when {
-                n <= ONE_ROW -> 1
-                n <= TWO_ROWS -> 2
-                else -> 3
-            }
-        val perRow = ceil(n / rows.toFloat()).toInt()
-        val maxCap = tubes.maxOf { it.capacity }
-        val slotW = width / perRow
-        // Item size limited by width (tube ~1.25 items wide) and by height (capacity + lift + label).
-        itemSize = minOf(slotW * 0.62f, height / rows / (maxCap + ROW_EXTRA_ITEMS), MAX_ITEM)
-        val rowH = itemSize * (maxCap + ROW_EXTRA_ITEMS)
-        val topOffset = (height - rowH * rows) / 2
-        pad = itemSize * 0.14f
-        lift = itemSize * 0.95f
-        val tubeW = itemSize + pad * 2
-        for (r in 0 until rows) {
-            val start = r * perRow
-            val count = minOf(perRow, n - start)
-            if (count <= 0) break
-            val rowY = height - topOffset - (r + 1) * rowH
-            val baseY = rowY + itemSize * LABEL_SPACE
-            val rowSlot = width / count.coerceAtLeast(1)
-            val usedSlot = minOf(rowSlot, slotW)
-            val offsetX = (width - usedSlot * count) / 2
-            for (c in 0 until count) {
-                val i = start + c
-                val cx = offsetX + usedSlot * (c + 0.5f)
-                val h = tubes[i].capacity * itemSize + pad * 2
-                tubeRects += Rectangle(cx - tubeW / 2, baseY, tubeW, h)
-                hitRects += Rectangle(cx - usedSlot / 2, rowY, usedSlot, rowH)
-            }
-        }
+        for (b in layout.tubes) tubeRects += Rectangle(b.x, b.y, b.w, b.h)
+        for (b in layout.cells) hitRects += Rectangle(b.x, b.y, b.w, b.h)
+        itemSize = layout.itemSize
+        pad = layout.pad
+        lift = layout.lift
     }
 
     /** Center of slot [index] in tube [tube], in local coordinates. */
@@ -176,12 +158,9 @@ class BoardView(
         tube: Int,
         index: Int,
         lifted: Boolean = false,
-    ): Pair<Float, Float> {
-        val r = tubeRects[tube]
-        val y = r.y + pad + itemSize * (index + 0.5f) + if (lifted) lift else 0f
-        return (r.x + r.width / 2) to y
-    }
+    ): Pair<Float, Float> = layout.itemCenter(tube, index, lifted)
 
+    /** The drawn glass of tube [index], in local coordinates (for the UI-test probe). */
     fun tubeRect(index: Int): Rectangle? = tubeRects.getOrNull(index)
 
     override fun act(delta: Float) {
@@ -210,24 +189,30 @@ class BoardView(
         parentAlpha: Float,
     ) {
         if (tubeRects.size != board.tubes.size) layoutTubes()
+        // Pass one: glow, shadow and glass, with the shape renderer.
         batch.end()
         Gdx.gl.glEnable(GL20.GL_BLEND)
         val sr = game.shapes
         sr.projectionMatrix = batch.projectionMatrix
         sr.transformMatrix.set(batch.transformMatrix).translate(x, y, 0f)
         sr.begin(ShapeRenderer.ShapeType.Filled)
-        texts.clear()
-        val flying = flights.map { it.item.id }.toHashSet()
-        board.tubes.forEachIndexed { i, tube -> drawTube(sr, i, tube, flying) }
-        for (f in flights) drawFlight(sr, f)
-        pointer?.let { drawPointer(sr, it) }
+        for (i in board.tubes.indices) drawGlass(sr, i)
         sr.end()
+        // Pass two: dressing, items and overlays, as sprites.
         batch.begin()
+        val oldTransform = tmpMatrix.set(batch.transformMatrix)
+        batch.transformMatrix = tmpMatrix2.set(oldTransform).translate(x, y, 0f)
+        texts.clear()
+        val flying = flights.mapTo(HashSet()) { it.item.id }
+        board.tubes.forEachIndexed { i, tube -> drawTube(batch, i, tube, flying) }
+        for (f in flights) drawFlight(batch, f)
+        pointer?.let { drawPointer(batch, it) }
         for (t in texts) {
             t.font.color = t.color
             glyphs.setText(t.font, t.text)
-            t.font.draw(batch, t.text, x + t.x - glyphs.width / 2, y + t.y + glyphs.height / 2)
+            t.font.draw(batch, t.text, t.x - glyphs.width / 2, t.y + glyphs.height / 2)
         }
+        batch.transformMatrix = oldTransform
     }
 
     private fun shakeOffset(i: Int): Float {
@@ -235,14 +220,16 @@ class BoardView(
         return sin(s * SHAKE_FREQ) * SHAKE_AMP * (s / SHAKE_TIME)
     }
 
-    private fun drawTube(
+    private fun shaken(i: Int): Rectangle? {
+        val base = tubeRects.getOrNull(i) ?: return null
+        return tmpRect.set(base).apply { x += shakeOffset(i) }
+    }
+
+    private fun drawGlass(
         sr: ShapeRenderer,
         i: Int,
-        tube: Tube,
-        flying: Set<Int>,
     ) {
-        val base = tubeRects.getOrNull(i) ?: return
-        val r = Rectangle(base).apply { x += shakeOffset(i) }
+        val r = shaken(i) ?: return
         val radius = r.width / 2
         val glow = hint?.let { it.from == i || it.to == i } == true || pointer == i
         if (glow) {
@@ -250,24 +237,28 @@ class BoardView(
             sr.color = Color(Theme.highlight).apply { a = 0.85f * pulse }
             Shapes.tubeBody(sr, r.x - 7, r.y - 7, r.width + 14, r.height + 14, radius + 7)
         }
-        sr.color = Theme.shadow
-        Shapes.tubeBody(sr, r.x + 3, r.y - 4, r.width, r.height, radius)
-        sr.color = Theme.glassEdge
-        Shapes.tubeBody(sr, r.x, r.y, r.width, r.height, radius)
-        sr.color = Theme.glass
-        Shapes.tubeBody(sr, r.x + 3, r.y + 3, r.width - 6, r.height - 3, radius - 3)
+        TubeArt.glass(sr, theme, r, time, !reduceMotion)
+    }
 
-        drawItems(sr, i, tube, r, flying)
-        sr.color = GLASS_SHINE
-        sr.rect(r.x + r.width * 0.18f, r.y + r.height * 0.2f, r.width * 0.1f, r.height * 0.7f)
-
-        if (tube.isComplete) drawLid(sr, i, r)
-        tube.onlyType?.let { drawLabel(sr, it, r) }
-        tube.lockType?.let { drawLock(sr, it, r) }
+    private fun drawTube(
+        batch: Batch,
+        i: Int,
+        tube: Tube,
+        flying: Set<Int>,
+    ) {
+        val r = shaken(i) ?: return
+        val art = game.assets.art
+        TubeArt.base(batch, art, theme, r)
+        drawItems(batch, i, tube, r, flying)
+        TubeArt.shine(batch, game.assets.white, r)
+        TubeArt.collar(batch, art, theme, r, itemSize)
+        if (tube.isComplete) drawLid(batch, i, r)
+        tube.onlyType?.let { drawLabel(batch, it, r) }
+        tube.lockType?.let { drawLock(batch, it, r) }
     }
 
     private fun drawItems(
-        sr: ShapeRenderer,
+        batch: Batch,
         i: Int,
         tube: Tube,
         r: Rectangle,
@@ -280,85 +271,80 @@ class BoardView(
             val cx = r.x + r.width / 2
             val bob = if (k >= liftFrom && !reduceMotion) sin(time * 5f) * 2f else 0f
             val cy = r.y + pad + itemSize * (k + 0.5f) + if (k >= liftFrom) lift + bob else 0f
-            drawItem(sr, item, cx, cy)
-            if (item.gluedUp && k + 1 < tube.size) {
-                sr.color = GLUE
-                Shapes.roundedRect(sr, cx - itemSize * 0.18f, cy + itemSize * 0.28f, itemSize * 0.36f, itemSize * 0.44f, itemSize * 0.15f)
-            }
+            drawItem(batch, item, cx, cy)
+            if (item.gluedUp && k + 1 < tube.size) sprite(batch, "ov.glue", cx, cy + itemSize * 0.5f, itemSize * 0.62f)
         }
     }
 
     private fun drawItem(
-        sr: ShapeRenderer,
+        batch: Batch,
         item: Item,
         cx: Float,
         cy: Float,
     ) {
-        val s = itemSize * 0.86f
+        val s = itemSize * ITEM_CELL
         if (item.hidden) {
-            sr.color = HIDDEN_BACK
-            Shapes.roundedRect(sr, cx - s / 2, cy - s / 2, s, s, s * 0.3f)
-            texts += TextDraw("?", cx, cy, game.assets.body, Color.WHITE)
+            sprite(batch, "ov.hidden", cx, cy, itemSize * HIDDEN_CELL)
             return
         }
-        ItemArt.draw(sr, item.type, cx, cy, s, colorblind)
+        ItemArt.draw(batch, game.assets.art, look, item.type, cx, cy, s, colorblind)
         if (item.isFrozen) {
-            sr.color = ICE
-            Shapes.roundedRect(sr, cx - s * 0.55f, cy - s * 0.55f, s * 1.1f, s * 1.1f, s * 0.25f)
-            sr.color = ICE_EDGE
-            sr.rect(cx - s * 0.4f, cy + s * 0.25f, s * 0.3f, s * 0.08f)
+            sprite(batch, "ov.ice", cx, cy, itemSize * ICE_CELL)
             texts += TextDraw(item.frozen.toString(), cx, cy, game.assets.body, Theme.ink)
         }
     }
 
+    private fun sprite(
+        batch: Batch,
+        name: String,
+        cx: Float,
+        cy: Float,
+        side: Float,
+    ) {
+        game.assets.art.region(name)?.let { batch.draw(it, cx - side / 2, cy - side / 2, side, side) }
+    }
+
     private fun drawLid(
-        sr: ShapeRenderer,
+        batch: Batch,
         i: Int,
         r: Rectangle,
     ) {
         val t = lids[i]?.let { Interpolation.bounceOut.apply(1f - it / LID_TIME) } ?: 1f
         val drop = (1f - t) * itemSize
         val top = board.tubes[i].items.firstOrNull()?.type ?: 0
-        val color = Theme.itemColor(top, colorblind)
-        sr.color = Shapes.shade(color, 0.3f)
-        Shapes.roundedRect(sr, r.x - 4, r.y + r.height - 2 + drop, r.width + 8, itemSize * 0.32f, itemSize * 0.12f)
-        sr.color = Shapes.tint(color, 0.15f)
-        Shapes.roundedRect(sr, r.x - 4, r.y + r.height + 1 + drop, r.width + 8, itemSize * 0.27f, itemSize * 0.12f)
+        TubeArt.lid(batch, game.assets.art, theme, r, drop, ItemArt.color(look, top, colorblind))
     }
 
     private fun drawLabel(
-        sr: ShapeRenderer,
+        batch: Batch,
         type: Int,
         r: Rectangle,
     ) {
-        val s = itemSize * 0.5f
         val cy = r.y - itemSize * 0.36f
-        sr.color = Theme.paper
-        Shapes.roundedRect(sr, r.x - 2, cy - s * 0.6f, r.width + 4, s * 1.2f, s * 0.3f)
-        ItemArt.draw(sr, type, r.x + r.width / 2, cy, s, colorblind, face = false)
+        val cx = r.x + r.width / 2
+        sprite(batch, "ov.label", cx, cy, (r.width + 10f) / LABEL_SPAN)
+        ItemArt.draw(batch, game.assets.art, look, type, cx, cy, itemSize * 0.62f, colorblind, face = false)
     }
 
     private fun drawLock(
-        sr: ShapeRenderer,
+        batch: Batch,
         type: Int,
         r: Rectangle,
     ) {
-        sr.color = LOCK_VEIL
-        Shapes.tubeBody(sr, r.x, r.y, r.width, r.height, r.width / 2)
+        val old = batch.packedColor
+        batch.color = LOCK_VEIL
+        batch.draw(game.assets.white, r.x, r.y, r.width, r.height)
+        batch.packedColor = old
         val cx = r.x + r.width / 2
         val cy = r.y + r.height * 0.55f
-        val w = itemSize * 0.9f
-        sr.color = Theme.inkSoft
-        sr.arc(cx, cy + w * 0.35f, w * 0.32f, 0f, 180f, 16)
-        sr.color = LOCK_VEIL_SOLID
-        sr.arc(cx, cy + w * 0.35f, w * 0.18f, 0f, 180f, 16)
-        sr.color = Theme.inkSoft
-        Shapes.roundedRect(sr, cx - w / 2, cy - w * 0.4f, w, w * 0.78f, w * 0.15f)
-        ItemArt.draw(sr, type, cx, cy - w * 0.02f, w * 0.55f, colorblind, face = false)
+        val w = maxOf(itemSize * 1.25f, r.width * 1.1f)
+        sprite(batch, "ov.lock", cx, cy, w)
+        // The padlock's window sits at (50, 67) of its 100-unit cell.
+        ItemArt.draw(batch, game.assets.art, look, type, cx, cy - w * 0.17f, w * 0.38f, colorblind, face = false)
     }
 
     private fun drawFlight(
-        sr: ShapeRenderer,
+        batch: Batch,
         f: Flight,
     ) {
         val p = ((f.t - f.delay) / f.duration).coerceIn(0f, 1f)
@@ -367,28 +353,21 @@ class BoardView(
         val x = MathUtils.lerp(f.fromX, tx, e)
         val arc = if (reduceMotion) 0f else sin(p * MathUtils.PI) * itemSize * 1.6f
         val y = MathUtils.lerp(f.fromY, ty, e) + arc
-        drawItem(sr, f.item, x, y)
+        drawItem(batch, f.item, x, y)
     }
 
     private fun drawPointer(
-        sr: ShapeRenderer,
+        batch: Batch,
         i: Int,
     ) {
         val r = tubeRects.getOrNull(i) ?: return
         val bounce = if (reduceMotion) 0f else sin(time * 6f) * 8f
         val cx = r.x + r.width / 2
-        val top = r.y + r.height + itemSize * 1.2f + bounce
-        sr.color = Theme.primary
-        sr.triangle(cx - 16, top + 22, cx + 16, top + 22, cx, top)
-        sr.rect(cx - 6f, top + 20f, 12f, 18f)
+        val side = POINTER_SIZE
+        sprite(batch, "ov.pointer", cx, r.y + r.height + itemSize * 1.2f + bounce + side / 2, side)
     }
 
     companion object {
-        private const val ONE_ROW = 7
-        private const val TWO_ROWS = 14
-        private const val MAX_ITEM = 52f
-        private const val ROW_EXTRA_ITEMS = 2.6f
-        private const val LABEL_SPACE = 0.8f
         private const val FLIGHT = 0.28f
         private const val QUICK_FLIGHT = 0.08f
         private const val STAGGER = 0.04f
@@ -396,12 +375,11 @@ class BoardView(
         private const val SHAKE_FREQ = 45f
         private const val SHAKE_AMP = 7f
         private const val LID_TIME = 0.45f
-        private val GLUE = Color(1f, 0.97f, 0.85f, 0.95f)
-        private val HIDDEN_BACK = Color.valueOf("8E86A8")
-        private val ICE = Color(0.75f, 0.9f, 1f, 0.72f)
-        private val ICE_EDGE = Color(1f, 1f, 1f, 0.9f)
-        private val GLASS_SHINE = Color(1f, 1f, 1f, 0.35f)
-        private val LOCK_VEIL = Color(0.9f, 0.88f, 0.95f, 0.6f)
-        private val LOCK_VEIL_SOLID = Color(0.93f, 0.91f, 0.97f, 1f)
+        private const val ITEM_CELL = 1.08f
+        private const val HIDDEN_CELL = 0.98f
+        private const val ICE_CELL = 1.02f
+        private const val LABEL_SPAN = 0.88f
+        private const val POINTER_SIZE = 46f
+        private val LOCK_VEIL = Color(0.9f, 0.88f, 0.95f, 0.55f)
     }
 }

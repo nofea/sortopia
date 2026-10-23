@@ -8,25 +8,6 @@ import kotlin.math.sin
 
 /** Filled-shape helpers on top of [ShapeRenderer] (which must be in Filled mode). */
 object Shapes {
-    fun roundedRect(
-        sr: ShapeRenderer,
-        x: Float,
-        y: Float,
-        w: Float,
-        h: Float,
-        radius: Float,
-    ) {
-        val r = minOf(radius, w / 2, h / 2)
-        sr.rect(x + r, y, w - 2 * r, h)
-        sr.rect(x, y + r, r, h - 2 * r)
-        sr.rect(x + w - r, y + r, r, h - 2 * r)
-        val seg = 12
-        sr.arc(x + r, y + r, r, 180f, 90f, seg)
-        sr.arc(x + w - r, y + r, r, 270f, 90f, seg)
-        sr.arc(x + w - r, y + h - r, r, 0f, 90f, seg)
-        sr.arc(x + r, y + h - r, r, 90f, 90f, seg)
-    }
-
     /** A tube: rounded at the bottom, square at the top. */
     fun tubeBody(
         sr: ShapeRenderer,
@@ -41,23 +22,6 @@ object Shapes {
         sr.rect(x, y + r, w, h - r)
         sr.arc(x + r, y + r, r, 180f, 90f, 12)
         sr.arc(x + w - r, y + r, r, 270f, 90f, 12)
-    }
-
-    fun polygon(
-        sr: ShapeRenderer,
-        cx: Float,
-        cy: Float,
-        radius: Float,
-        sides: Int,
-        rotationDeg: Float = 90f,
-    ) {
-        val pts = FloatArray(sides * 2)
-        for (i in 0 until sides) {
-            val a = MathUtils.degreesToRadians * (rotationDeg + 360f * i / sides)
-            pts[i * 2] = cx + radius * cos(a)
-            pts[i * 2 + 1] = cy + radius * sin(a)
-        }
-        fan(sr, cx, cy, pts)
     }
 
     fun star(
@@ -92,25 +56,8 @@ object Shapes {
         }
     }
 
-    fun heart(
-        sr: ShapeRenderer,
-        cx: Float,
-        cy: Float,
-        s: Float,
-    ) {
-        val r = s * 0.5f
-        sr.circle(cx - r * 0.95f, cy + r * 0.35f, r, 20)
-        sr.circle(cx + r * 0.95f, cy + r * 0.35f, r, 20)
-        sr.triangle(cx - s * 0.98f, cy + r * 0.1f, cx + s * 0.98f, cy + r * 0.1f, cx, cy - s * 1.05f)
-    }
-
     fun shade(
         c: Color,
         amount: Float,
     ): Color = Color(c).lerp(Color.BLACK, amount)
-
-    fun tint(
-        c: Color,
-        amount: Float,
-    ): Color = Color(c).lerp(Color.WHITE, amount)
 }

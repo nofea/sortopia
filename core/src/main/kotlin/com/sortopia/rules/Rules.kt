@@ -34,7 +34,7 @@ sealed interface PourResult {
     ) : PourResult
 }
 
-/** The pure rules of Sortopia (SPEC §2 and §6.1). */
+/** The pure rules of Sortopia (SPEC §2 and §6.3). */
 object Rules {
     /**
      * The unit that would leave [tube] when used as a source, bottom to top,

@@ -98,6 +98,34 @@ class SortopiaUiTest {
     }
 
     @Test
+    fun tapsBetweenTubesSelectTheNearestTube() {
+        d.seed(SaveData(flags = listOf("tutorial-done", "tips-helpers")))
+        d.launch()
+        openLevel(1, 1)
+        d.screenshot("board")
+        val (from, _) = d.solution().first()
+        val glass = DebugTestBridge.bounds("glass-$from")!!
+        val cell = DebugTestBridge.bounds("tube-$from")!!
+        // Beside the glass, in the gap towards the neighbour, but nearer this tube.
+        val gapX =
+            if (cell.right - glass.right >
+                glass.left - cell.left
+            ) {
+                glass.right + (cell.right - glass.right) / 2
+            } else {
+                glass.left - (glass.left - cell.left) / 2
+            }
+        assertFalse("the tap point is outside the glass", glass.contains(gapX, glass.centerY()))
+        d.tapAt(gapX, glass.centerY())
+        d.waitUntil("tube $from selected from the gap") { d.state("selected") == from.toString() }
+        // Above the glass also goes to the tube below.
+        d.tap("tube-$from")
+        d.waitUntil("deselected") { d.state("selected").isNullOrEmpty() }
+        d.tapAt(glass.centerX(), glass.top - glass.width() / 2)
+        d.waitUntil("tube $from selected from above") { d.state("selected") == from.toString() }
+    }
+
+    @Test
     fun solvingTheLastLevelUnlocksTheNextWorld() {
         val best = (1..19).associate { LevelId.Campaign(1, it).key to Tuning.basePoints(LevelId.Campaign(1, it)) }
         d.seed(SaveData(best = best, flags = listOf("tutorial-done", "tips-helpers")))

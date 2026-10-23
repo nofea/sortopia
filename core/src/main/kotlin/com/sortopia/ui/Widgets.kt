@@ -11,6 +11,8 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextButton
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
 import com.badlogic.gdx.utils.Align
 import com.sortopia.SortopiaGame
+import com.sortopia.theme.Look
+import com.sortopia.ui.render.ItemArt
 import com.sortopia.ui.render.Shapes
 
 /** An actor drawn with the shared [ShapeRenderer]. */
@@ -31,6 +33,21 @@ open class ShapeActor(
         painter(sr, x, y, width, height)
         sr.end()
         batch.begin()
+    }
+}
+
+/** One themed item, drawn from the art atlas. */
+class ItemActor(
+    private val game: SortopiaGame,
+    private val look: Look,
+    private val type: Int,
+) : Actor() {
+    override fun draw(
+        batch: Batch,
+        parentAlpha: Float,
+    ) {
+        val colorblind = game.settings.colorblindPalette
+        ItemArt.draw(batch, game.assets.art, look, type, x + width / 2, y + height / 2, width, colorblind, alpha = color.a * parentAlpha)
     }
 }
 
@@ -96,6 +113,12 @@ class Widgets(
                 }
             }
         }.apply { setSize(size * 3.3f, size) }
+
+    /** A world's emblem: its first item, with a face (SPEC §13: themed UI accents). */
+    fun emblem(
+        theme: WorldTheme,
+        size: Float,
+    ): Actor = ItemActor(game, Look(theme.def, theme.def.items), 0).apply { setSize(size, size) }
 
     fun coin(size: Float): Actor =
         ShapeActor(game) { sr, x, y, w, h ->

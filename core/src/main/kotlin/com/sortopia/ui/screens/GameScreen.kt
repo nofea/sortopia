@@ -1,10 +1,13 @@
 package com.sortopia.ui.screens
 
+import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.math.Rectangle
 import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.scenes.scene2d.Actor
+import com.badlogic.gdx.scenes.scene2d.Touchable
 import com.badlogic.gdx.scenes.scene2d.actions.Actions
+import com.badlogic.gdx.scenes.scene2d.ui.Label
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton
 import com.badlogic.gdx.utils.Align
@@ -24,10 +27,10 @@ import com.sortopia.rules.Rules
 import com.sortopia.save.EventCodec
 import com.sortopia.save.InProgress
 import com.sortopia.solver.Solver
+import com.sortopia.theme.ThemeCatalog
 import com.sortopia.ui.BoardView
 import com.sortopia.ui.Panels
 import com.sortopia.ui.Sfx
-import com.sortopia.ui.ShapeActor
 import com.sortopia.ui.Theme
 import com.sortopia.ui.WorldTheme
 
@@ -37,18 +40,14 @@ class GameScreen(
     private val id: LevelId,
     private val resume: InProgress? = null,
 ) : BaseScreen(game) {
-    override val theme: WorldTheme =
-        when (id) {
-            is LevelId.Campaign -> Theme.world(id.world)
-            is LevelId.Endless -> Theme.endless
-            is LevelId.Daily -> Theme.daily
-        }
+    override val theme: WorldTheme = Theme.forLevel(id)
+    private val look = ThemeCatalog.lookFor(id)
     override val probeName = "game"
 
     private val progress get() = game.progress
     private var session: GameSession? = null
-    private val board = BoardView(game, ::onTubeTapped)
-    private val panels = Panels(game, ui) { pid, b -> probe("overlay-$pid", b) }
+    private val board = BoardView(game, theme, look, ::onTubeTapped)
+    private val panels = Panels(game, ui, theme, look) { pid, b -> probe("overlay-$pid", b) }
 
     private val titleLabel = ui.label(levelTitle(), "default")
     private val movesLabel = ui.label("", "small")
@@ -66,13 +65,7 @@ class GameScreen(
 
     init {
         buildLayout()
-        game.audio.playMusic(
-            when (id) {
-                is LevelId.Campaign -> id.world
-                is LevelId.Endless -> ENDLESS_TRACK
-                is LevelId.Daily -> DAILY_TRACK
-            },
-        )
+        game.audio.playMusic(theme.def.track)
         game.level(id, ::start)
     }
 
@@ -85,10 +78,13 @@ class GameScreen(
 
     private fun buildLayout() {
         val top = Table()
-        val pause = probe("pause", ui.button("II") { openPause() })
+        val pause = probe("pause", ui.button("II") { openPause() }.apply { style = assets.accentStyle(theme.accent) })
         top.add(pause).size(56f).left()
         val mid = Table()
-        mid.add(titleLabel).row()
+        val title = Table()
+        title.add(ui.emblem(theme, EMBLEM)).size(EMBLEM).padRight(4f)
+        title.add(titleLabel)
+        mid.add(title).row()
         mid.add(movesLabel).row()
         mid.add(timerLabel)
         top.add(mid).expandX()
@@ -96,23 +92,40 @@ class GameScreen(
         wallet.add(ui.coin(24f)).padRight(6f)
         wallet.add(probe("wallet", walletLabel))
         top.add(wallet).right().minWidth(90f)
-        root.top().pad(12f)
+        root.top().pad(8f)
         root.add(top).expandX().fillX().row()
-        root.add(banner).expandX().fillX().height(64f).padTop(4f).row()
+        // The banner and toast float over the board instead of taking rows, so the tubes get the
+        // height (SPEC §14). They never take taps meant for the tubes.
+        val notes =
+            Table().apply {
+                touchable = Touchable.disabled
+                top()
+                add(banner).expandX().fillX().row()
+                add().expand().row()
+                add(toast).expandX().fillX()
+            }
         val stack = com.badlogic.gdx.scenes.scene2d.ui.Stack()
         stack.add(board)
         stack.add(Table().apply { add(loading) })
-        root.add(stack).expand().fill().row()
-        root.add(toast).expandX().fillX().height(40f).row()
+        stack.add(notes)
+        root.add(stack).expand().fill().padTop(4f).row()
         val helpers = Table()
-        helpers.defaults().expandX().fillX().height(72f).pad(4f)
+        helpers.defaults().expandX().fillX().height(HELPER_H).pad(3f)
         helpers.add(helperButton("undo", str("helper.undo"), Helpers.UNDO_COST) { undo() })
         helpers.add(helperButton("hint", str("helper.hint"), Helpers.HINT_COST) { hint() })
         helpers.add(helperButton("extra", str("helper.extra"), Helpers.EXTRA_TUBE_COST) { extraTube() })
         helpers.add(helperButton("restart", str("helper.restart"), 0) { restart() })
-        root.add(helpers).expandX().fillX().padBottom(8f)
+        root.add(helpers).expandX().fillX().padBottom(4f)
         stage.addActor(confetti)
         toast.color.a = 0f
+        toast.style = Label.LabelStyle(toast.style).apply { background = assets.round(TOAST_BACK) }
+        banner.style = Label.LabelStyle(banner.style).apply { background = assets.round(BANNER_BACK) }
+        banner.isVisible = false
+    }
+
+    private fun showBanner(text: String) {
+        banner.setText(text)
+        banner.isVisible = text.isNotEmpty()
     }
 
     private fun helperButton(
@@ -122,6 +135,7 @@ class GameScreen(
         onClick: () -> Unit,
     ): TextButton {
         val b = ui.button(text, onClick = onClick)
+        b.style = assets.accentStyle(theme.accent)
         b.row()
         b.add(ui.label(if (cost == 0) str("helper.free") else str("helper.cost", cost), "small"))
         return probe("helper-$pid", b)
@@ -172,7 +186,7 @@ class GameScreen(
             }
             !progress.hasFlag(FLAG_TIPS) && progress.hasFlag(FLAG_TUTORIAL) -> showTips()
         }
-        if (level.params.mechanics.isEmpty() && tutorial) banner.setText(str("tutorial.step1"))
+        if (level.params.mechanics.isEmpty() && tutorial) showBanner(str("tutorial.step1"))
     }
 
     private fun showTips() {
@@ -241,8 +255,8 @@ class GameScreen(
         if (!p.active) return
         val s = session ?: return
         for (i in s.board.tubes.indices) {
-            val r = board.hitRects.getOrNull(i) ?: continue
-            reportRect("tube-$i", r)
+            board.hitRects.getOrNull(i)?.let { reportRect("tube-$i", it) }
+            board.tubeRect(i)?.let { reportRect("glass-$i", it) }
         }
         p.state("level", id.key)
         p.state("moves", s.moves.toString())
@@ -317,7 +331,7 @@ class GameScreen(
                     game.audio.haptic(Haptic.SUCCESS)
                     if (tutorial && !tutorialSealedShown) {
                         tutorialSealedShown = true
-                        banner.setText(str("tutorial.sealed"))
+                        showBanner(str("tutorial.sealed"))
                     }
                 }
                 afterBoardChange()
@@ -352,14 +366,14 @@ class GameScreen(
             move == null -> board.pointer = null
             sel == null -> {
                 board.pointer = move.from
-                if (s.moves == 0) banner.setText(str("tutorial.step1"))
+                if (s.moves == 0) showBanner(str("tutorial.step1"))
             }
             else -> {
                 board.pointer = if (sel == move.from) move.to else null
-                if (s.moves == 0) banner.setText(str("tutorial.step2"))
+                if (s.moves == 0) showBanner(str("tutorial.step2"))
             }
         }
-        if (s.moves == 1 && !tutorialSealedShown) banner.setText(str("tutorial.step3"))
+        if (s.moves == 1 && !tutorialSealedShown) showBanner(str("tutorial.step3"))
     }
 
     private fun undo() {
@@ -527,7 +541,7 @@ class GameScreen(
             tutorial = false
             progress.setFlag(FLAG_TUTORIAL)
             board.pointer = null
-            banner.setText(str("tutorial.finish"))
+            showBanner(str("tutorial.finish"))
         }
         game.save()
         game.audio.play(Sfx.COMPLETE)
@@ -591,21 +605,18 @@ class GameScreen(
         return "%d:%02d".format(total / 60, total % 60)
     }
 
-    /** Simple confetti burst shown when a level is solved (skipped with Reduce motion). */
+    /**
+     * Celebration when a level is solved (SPEC §13): the level's own items and the world's
+     * particles burst out of the board. Skipped with Reduce motion.
+     */
     private inner class Confetti : Actor() {
         private val particles = ArrayList<FloatArray>()
-        private val painter =
-            ShapeActor(game) { sr, _, _, _, _ ->
-                for (p in particles) {
-                    sr.color = Theme.itemColor(p[5].toInt(), false)
-                    sr.rect(p[0], p[1], 8f, 12f)
-                }
-            }
 
         fun burst(
             w: Float,
             h: Float,
         ) {
+            val types = session?.level?.params?.types ?: look.items.size
             repeat(CONFETTI) {
                 particles +=
                     floatArrayOf(
@@ -614,7 +625,11 @@ class GameScreen(
                         MathUtils.random(-260f, 260f),
                         MathUtils.random(200f, 620f),
                         MathUtils.random(1.6f, 2.6f),
-                        MathUtils.random(0, 13).toFloat(),
+                        // Every third piece is a world particle (-1), the rest the level's items.
+                        if (it % 3 == 0) -1f else MathUtils.random(0, types - 1).toFloat(),
+                        MathUtils.random(0f, 360f),
+                        MathUtils.random(-240f, 240f),
+                        MathUtils.random(26f, 40f),
                     )
             }
             toFront()
@@ -626,6 +641,7 @@ class GameScreen(
                 p[1] += p[3] * delta
                 p[3] -= GRAVITY * delta
                 p[4] -= delta
+                p[6] += p[7] * delta
             }
             particles.removeAll { it[4] <= 0f }
         }
@@ -634,16 +650,34 @@ class GameScreen(
             batch: com.badlogic.gdx.graphics.g2d.Batch,
             parentAlpha: Float,
         ) {
-            if (particles.isNotEmpty()) painter.draw(batch, parentAlpha)
+            val art = assets.art
+            val sprite = art.region(theme.def.particle.art)
+            for (p in particles) {
+                val size = p[8]
+                val fade = p[4].coerceAtMost(0.5f) * 2f
+                if (p[5] < 0f) {
+                    if (sprite == null) continue
+                    batch.setColor(1f, 1f, 1f, fade * parentAlpha)
+                    batch.draw(sprite, p[0] - size / 2, p[1] - size / 2, size / 2, size / 2, size, size, 1f, 1f, p[6])
+                } else {
+                    batch.setColor(1f, 1f, 1f, parentAlpha)
+                    val colorblind = game.settings.colorblindPalette
+                    com.sortopia.ui.render.ItemArt
+                        .draw(batch, art, look, p[5].toInt(), p[0], p[1], size, colorblind, alpha = fade)
+                }
+            }
+            batch.setColor(1f, 1f, 1f, 1f)
         }
     }
 
     companion object {
         const val FLAG_TUTORIAL = "tutorial-done"
         const val FLAG_TIPS = "tips-helpers"
-        const val ENDLESS_TRACK = 6
-        private const val DAILY_TRACK = 1
         private const val TOAST_TIME = 2.2f
+        private const val HELPER_H = 64f
+        private const val EMBLEM = 26f
+        private val TOAST_BACK = Color(0.17f, 0.12f, 0.25f, 0.72f)
+        private val BANNER_BACK = Color(1f, 0.99f, 0.97f, 0.9f)
         private const val CONFETTI = 90
         private const val GRAVITY = 700f
     }

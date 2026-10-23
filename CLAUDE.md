@@ -17,6 +17,7 @@ Sortopia is an offline, portrait Android tube-sorting puzzle game.
   - solver, level generator
   - scoring, stars, economy, unlock rules
   - save model and validation
+  - the theme catalog (items, colours, tracks per world), the art index parser, and the board layout and tap mapping
 
   This code must have no LibGDX graphics or Android imports, so it can be unit-tested headless.
 - Platform services (Keystore HMAC key, file storage, haptics, clock, system font scale) go behind interfaces in `core`. They are implemented in `android` and `desktop`, and faked in tests.
@@ -32,6 +33,7 @@ All local work happens inside **devenv** ([devenv.sh](https://devenv.sh)). Nothi
   - Android SDK platform 36, build tools 36.0.0 and platform tools
   - the emulator, with an API 36 `google_apis` x86_64 system image
   - `osv-scanner`
+  - asset tools for `tools/`: Python with numpy, `rsvg-convert`, `oggenc`
 - Enter with `devenv shell`, or automatically through direnv (`.envrc` contains `use devenv`). One-off commands: `devenv shell -- <cmd>`.
 - Run Gradle through the wrapper (`./gradlew`) inside the devenv shell.
 
@@ -51,6 +53,8 @@ All local work happens inside **devenv** ([devenv.sh](https://devenv.sh)). Nothi
 | `emulator-start` | Boots the AVD (pass `-no-window` for headless), waits for boot, disables animations |
 | `emulator-stop` | Shuts the emulator down |
 | `gen-icon` | Regenerates the launcher icon layers, the store icon and a mask preview (`tools/gen_icon.py`) |
+| `gen-art` | Regenerates the in-game art: item, dressing, overlay and particle sheets, the atlas index, and the world backgrounds (`tools/gen_art.py`; `--svg <dir>` keeps the SVG sources) |
+| `gen-audio` | Regenerates the SFX and the lo-fi music loops (`tools/gen_audio.py`); pass track names (e.g. `world1 menu`) to make only those |
 | `ui-test` | `:android:connectedDebugAndroidTest` on the running emulator |
 | `vuln-scan` | OSV scan: fails on vulnerable **shipped** dependencies (`android/gradle.lockfile`); build tooling is informational only |
 
@@ -128,23 +132,24 @@ Other useful commands:
 
 ## Project layout
 - `core/src/main/kotlin/com/sortopia/`
-  - `model`, `rules`, `solver`, `gen`, `game`, `save`: pure logic, unit-tested
+  - `model`, `rules`, `solver`, `gen`, `game`, `save`, `theme`, `layout`: pure logic, unit-tested
   - `platform`: interfaces (`Platform`, `UiProbe`)
-  - `ui`: LibGDX screens, the board view and rendering
+  - `ui`: LibGDX screens, the board view and rendering (`ui/render`: `ArtAtlas`, `ItemArt`, `TubeArt`)
 - `core/src/test/kotlin/com/sortopia/`: unit tests, mirroring the logic packages (`TestBoards.kt` holds shared board builders)
 - `android/src/main`: launcher, `AndroidPlatform`, and `KeystoreMac` (Keystore HMAC key, in `AndroidPlatform.kt`)
 - `android/src/debug`: `DebugTestBridge` and its installer. `android/src/release` holds the no-op installer.
 - `android/src/androidTest`: UI Automator tests (`GameDriver` reads the bridge and taps real coordinates)
-- `assets/`: font (Nunito, OFL), `i18n/strings.properties` (all player-facing text), `sfx/`, `music/`
-- `tools/gen_audio.py`: regenerates the placeholder audio deterministically
+- `assets/`: font (Nunito, OFL), `i18n/strings.properties` (all player-facing text), `sfx/`, `music/` (Ogg Vorbis), `art/` (generated sheets, `atlas.properties`, `bg/`)
+- `tools/gen_audio.py`: regenerates the SFX and music deterministically (fixed Ogg stream serial)
+- `tools/gen_art.py`: generates all in-game art as SVG and renders it with `rsvg-convert`. Items are layered (an outlined under-layer, a white body tinted at runtime, fixed details on top), with one shared face sprite placed at a per-item anchor. Edit the script, not the generated files.
 - `tools/gen_icon.py`: generates the launcher icon drawables (`ic_launcher_*.xml`) and `store/` (`icon.svg`, `icon-512.png` for Play, `icon-preview.png` showing masks and themed icons). Edit the script, not the generated files.
 - `config/detekt/detekt.yml`: detekt rules (on top of the defaults)
 - `scripts/`: the dev, build, release and emulator commands (devenv wraps them; CI calls them directly)
 - `.github/actions/setup-toolchain`: the CI toolchain setup (no devenv in CI)
 
 ## Current state / known gaps
-- Art is placeholder: items are procedural shapes with faces (distinct shape + color per type), not per-world illustrated icons (SPEC §13).
-- Audio is synthesized placeholder SFX and music loops (`tools/gen_audio.py`).
+- Art is generated vector art (`tools/gen_art.py`): per-world items, tube dressing and backgrounds (SPEC §6, §13). It is good enough to ship a beta, but hand-illustrated art would be a step up.
+- Audio is synthesized (`tools/gen_audio.py`): placeholder-quality SFX and lo-fi music loops.
 - Generation time: campaign levels take ≤ ~1.5 s on desktop. Some Endless levels take several seconds, so the game prefetches the next level in the background.
 ## Git
 - Main branch: `main`. Work on feature branches and open PRs to `main`.

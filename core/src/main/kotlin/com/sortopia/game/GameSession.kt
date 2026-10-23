@@ -152,7 +152,7 @@ class GameSession(
         return HelperResult.Done
     }
 
-    /** Free. Revealed hidden items stay revealed (SPEC §6.1). */
+    /** Free. Revealed hidden items stay revealed (SPEC §6.3). */
     fun restart() {
         board = withRevealed(level.board)
         history.clear()

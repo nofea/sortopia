@@ -1,21 +1,31 @@
 package com.sortopia.ui
 
 import com.badlogic.gdx.graphics.Color
+import com.sortopia.model.LevelId
+import com.sortopia.theme.ThemeCatalog
+import com.sortopia.theme.ThemeDef
 
-/** Per-world look (SPEC §6, §13). */
+/**
+ * Per-world look (SPEC §6, §13): background gradient, UI accent, and the glass of its tubes.
+ * [def] holds the rest (items, dressing art, particles, music). [glassFill] is an optional inner
+ * fill (water, frost) and [glassStripes] optional candy stripes.
+ */
 data class WorldTheme(
     val nameKey: String,
     val backgroundTop: Color,
     val backgroundBottom: Color,
     val accent: Color,
+    val def: ThemeDef,
+    val glass: Color = Color(1f, 1f, 1f, 0.35f),
+    val glassEdge: Color = Color(1f, 1f, 1f, 0.6f),
+    val glassFill: Color? = null,
+    val glassStripes: Color? = null,
 )
 
 object Theme {
     val ink: Color = Color.valueOf("3B3355")
     val inkSoft: Color = Color.valueOf("6E668A")
     val paper: Color = Color.valueOf("FFFDF8")
-    val glass: Color = Color(1f, 1f, 1f, 0.35f)
-    val glassEdge: Color = Color(1f, 1f, 1f, 0.6f)
     val shadow: Color = Color(0.2f, 0.15f, 0.3f, 0.18f)
     val star: Color = Color.valueOf("FFC531")
     val starEmpty: Color = Color(0.2f, 0.15f, 0.3f, 0.18f)
@@ -25,66 +35,96 @@ object Theme {
     val locked: Color = Color(1f, 1f, 1f, 0.42f)
     val highlight: Color = Color.valueOf("FFE066")
 
-    val worlds: List<WorldTheme> =
-        listOf(
-            WorldTheme("world1", Color.valueOf("FFF1D6"), Color.valueOf("FFD9B0"), Color.valueOf("F28C38")),
-            WorldTheme("world2", Color.valueOf("FFE3F1"), Color.valueOf("F8C8E6"), Color.valueOf("E8559A")),
-            WorldTheme("world3", Color.valueOf("E3F0FF"), Color.valueOf("C6DBFF"), Color.valueOf("4D7DF2")),
-            WorldTheme("world4", Color.valueOf("FFF6D9"), Color.valueOf("F1DFA8"), Color.valueOf("C9962E")),
-            WorldTheme("world5", Color.valueOf("FBEBDD"), Color.valueOf("EFD0B4"), Color.valueOf("B4703C")),
-            WorldTheme("world6", Color.valueOf("DDF6F7"), Color.valueOf("AEE3EA"), Color.valueOf("1F9DAE")),
-            WorldTheme("world7", Color.valueOf("F2EAFF"), Color.valueOf("DCCEFA"), Color.valueOf("8A63D2")),
-            WorldTheme("world8", Color.valueOf("E4E6F5"), Color.valueOf("C2C6E6"), Color.valueOf("5257A8")),
-        )
+    private fun c(
+        hex: String,
+        alpha: Float = 1f,
+    ): Color = Color.valueOf(hex).apply { a = alpha }
 
-    val endless: WorldTheme = WorldTheme("endless", Color.valueOf("E8F7EA"), Color.valueOf("BFE8C6"), Color.valueOf("3DAA5C"))
-    val daily: WorldTheme = WorldTheme("daily", Color.valueOf("FFF4E0"), Color.valueOf("FFDCA8"), Color.valueOf("F2A22C"))
+    val worlds: List<WorldTheme> =
+        ThemeCatalog.worlds.let { defs ->
+            listOf(
+                WorldTheme("world1", c("FFF1D6"), c("FFD9B0"), c("F28C38"), defs[0], glassEdge = c("FFF3DD", 0.75f)),
+                WorldTheme(
+                    "world2",
+                    c("FFE3F1"),
+                    c("F8C8E6"),
+                    c("E8559A"),
+                    defs[1],
+                    glass = c("FFE3F1", 0.4f),
+                    glassEdge = c("FFFFFF", 0.75f),
+                    glassStripes = c("F48FB1", 0.28f),
+                ),
+                WorldTheme(
+                    "world3",
+                    c("E3F0FF"),
+                    c("C6DBFF"),
+                    c("4D7DF2"),
+                    defs[2],
+                    glass = c("EAF4FF", 0.4f),
+                    glassEdge = c("FFFFFF", 0.75f),
+                ),
+                WorldTheme(
+                    "world4",
+                    c("FFF6D9"),
+                    c("F1DFA8"),
+                    c("C9962E"),
+                    defs[3],
+                    glass = c("FFF8E6", 0.4f),
+                    glassEdge = c("D4A54A", 0.6f),
+                ),
+                WorldTheme(
+                    "world5",
+                    c("FBEBDD"),
+                    c("EFD0B4"),
+                    c("B4703C"),
+                    defs[4],
+                    glass = c("FFFFFF", 0.42f),
+                    glassEdge = c("FFFFFF", 0.75f),
+                ),
+                WorldTheme(
+                    "world6",
+                    c("DDF6F7"),
+                    c("AEE3EA"),
+                    c("1F9DAE"),
+                    defs[5],
+                    glassEdge = c("FFFFFF", 0.75f),
+                    glassFill = c("4FC3F7", 0.26f),
+                ),
+                WorldTheme(
+                    "world7",
+                    c("F2EAFF"),
+                    c("DCCEFA"),
+                    c("8A63D2"),
+                    defs[6],
+                    glass = c("FFFFFF", 0.5f),
+                    glassEdge = c("FFFFFF", 0.85f),
+                    glassFill = c("FFFFFF", 0.18f),
+                ),
+                WorldTheme(
+                    "world8",
+                    c("E4E6F5"),
+                    c("C2C6E6"),
+                    c("5257A8"),
+                    defs[7],
+                    glass = c("E4E6F5", 0.38f),
+                    glassEdge = c("5D6470", 0.6f),
+                ),
+            )
+        }
+
+    val endless: WorldTheme = WorldTheme("endless", c("E8F7EA"), c("BFE8C6"), c("3DAA5C"), ThemeCatalog.neutral)
+
+    /** Menus use the neutral look; only the Daily card keeps its own accent. */
+    val menu: WorldTheme = endless.copy(nameKey = "app.name")
+    val dailyAccent: Color = c("F2A22C")
 
     fun world(world: Int): WorldTheme = worlds[(world - 1).coerceIn(0, worlds.size - 1)]
 
-    /** 14 item colors; shapes differ too, so color is never the only cue (SPEC §14). */
-    private val standardPalette: List<Color> =
-        listOf(
-            "EF5350",
-            "FFA726",
-            "FFD54F",
-            "66BB6A",
-            "26C6DA",
-            "42A5F5",
-            "5C6BC0",
-            "AB47BC",
-            "F06292",
-            "8D6E63",
-            "90A4AE",
-            "2E4057",
-            "C0CA33",
-            "00897B",
-        ).map(Color::valueOf)
-
-    /** High-distinction palette (Okabe-Ito plus Tol), for the colorblind setting. */
-    private val colorblindPalette: List<Color> =
-        listOf(
-            "E69F00",
-            "56B4E9",
-            "009E73",
-            "F0E442",
-            "0072B2",
-            "D55E00",
-            "CC79A7",
-            "222222",
-            "999999",
-            "AA4499",
-            "332288",
-            "44AA99",
-            "999933",
-            "882255",
-        ).map(Color::valueOf)
-
-    fun itemColor(
-        type: Int,
-        colorblind: Boolean,
-    ): Color {
-        val palette = if (colorblind) colorblindPalette else standardPalette
-        return palette[type.mod(palette.size)]
-    }
+    /** The look a level is played in: its world, its daily tier, or neutral for Endless. */
+    fun forLevel(id: LevelId): WorldTheme =
+        when (id) {
+            is LevelId.Campaign -> world(id.world)
+            is LevelId.Daily -> world(id.tier)
+            is LevelId.Endless -> endless
+        }
 }

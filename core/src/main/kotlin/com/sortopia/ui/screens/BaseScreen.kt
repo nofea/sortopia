@@ -17,18 +17,19 @@ import com.badlogic.gdx.scenes.scene2d.actions.Actions
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import com.badlogic.gdx.utils.viewport.ExtendViewport
 import com.sortopia.SortopiaGame
+import com.sortopia.theme.Particle
 import com.sortopia.ui.Theme
 import com.sortopia.ui.Widgets
 import com.sortopia.ui.WorldTheme
 import kotlin.math.sin
 
 /**
- * Shared screen plumbing: a portrait [Stage], themed gradient background with idle bubbles,
+ * Shared screen plumbing: a portrait [Stage], the world's background with idle particles,
  * modal overlays, the Android back key, and reporting element bounds to the UI-test probe.
  */
 abstract class BaseScreen(
     protected val game: SortopiaGame,
-    protected open val theme: WorldTheme = Theme.world(1),
+    protected open val theme: WorldTheme = Theme.menu,
 ) : ScreenAdapter() {
     protected val stage = Stage(ExtendViewport(VIRTUAL_WIDTH, VIRTUAL_HEIGHT), game.batch)
     protected val ui = Widgets(game)
@@ -95,6 +96,10 @@ abstract class BaseScreen(
 
     protected open fun onOverlayBack() = closeOverlay()
 
+    /**
+     * The world's background (SPEC §13): its gradient, an illustrated band pinned to the top and
+     * one to the bottom (so any screen height works), and its idle particles.
+     */
     private fun drawBackground() {
         val cam = stage.camera
         val sr = game.shapes
@@ -105,17 +110,50 @@ abstract class BaseScreen(
         sr.transformMatrix.idt()
         sr.begin(ShapeRenderer.ShapeType.Filled)
         sr.rect(0f, 0f, w, h, theme.backgroundBottom, theme.backgroundBottom, theme.backgroundTop, theme.backgroundTop)
-        val motion = !game.settings.reduceMotion
-        for (i in 0 until BUBBLES) {
-            val seed = i * 97.31f
-            val bx = (seed * 13.7f) % w
-            val speed = 8f + (i % 4) * 4f
-            val by = if (motion) (seed * 7.3f + time * speed) % (h + 80f) - 40f else (seed * 7.3f) % h
-            val wobble = if (motion) sin(time * 0.8f + i) * 6f else 0f
-            sr.color = BUBBLE
-            sr.circle(bx + wobble, by, 10f + (i % 5) * 6f, 20)
-        }
         sr.end()
+        val batch = game.batch
+        batch.projectionMatrix = cam.combined
+        batch.transformMatrix.idt()
+        batch.begin()
+        batch.setColor(1f, 1f, 1f, 1f)
+        val art = assets.art
+        art.background(theme.def.id, "bottom")?.let { batch.draw(it, 0f, 0f, w, w * it.height / it.width) }
+        art.background(theme.def.id, "top")?.let {
+            val bh = w * it.height / it.width
+            batch.draw(it, 0f, h - bh, w, bh)
+        }
+        if (!game.settings.reduceMotion) drawParticles(batch, w, h)
+        batch.end()
+    }
+
+    private fun drawParticles(
+        batch: com.badlogic.gdx.graphics.g2d.Batch,
+        w: Float,
+        h: Float,
+    ) {
+        val kind = theme.def.particle
+        val sprite = assets.art.region(kind.art) ?: return
+        val falls = kind in FALLING
+        val rises = kind in RISING
+        for (i in 0 until PARTICLES) {
+            val seed = i * 97.31f
+            val size = 14f + (i % 4) * 6f
+            val speed = 10f + (i % 4) * 5f
+            val bx = (seed * 13.7f) % w + sin(time * 0.8f + i) * 8f
+            val base = (seed * 7.3f) % (h + 80f)
+            val by =
+                when {
+                    rises -> (base + time * speed) % (h + 80f) - 40f
+                    falls -> h + 40f - (base + time * speed) % (h + 80f)
+                    else -> base
+                }
+            // Twinkling kinds pulse in place; drifting ones fade gently.
+            val pulse = if (rises || falls) PARTICLE_ALPHA else PARTICLE_ALPHA * (0.5f + 0.5f * sin(time * 1.6f + i * 1.3f))
+            batch.setColor(1f, 1f, 1f, pulse)
+            val spin = if (falls) sin(time * 0.9f + i) * 40f else 0f
+            batch.draw(sprite, bx - size / 2, by - size / 2, size / 2, size / 2, size, size, 1f, 1f, spin)
+        }
+        batch.setColor(1f, 1f, 1f, 1f)
     }
 
     /** Registers [actor] so UI tests can find it by [id]. */
@@ -189,8 +227,10 @@ abstract class BaseScreen(
     companion object {
         const val VIRTUAL_WIDTH = 480f
         const val VIRTUAL_HEIGHT = 860f
-        private const val BUBBLES = 14
-        private val BUBBLE = Color(1f, 1f, 1f, 0.22f)
+        private const val PARTICLES = 14
+        private const val PARTICLE_ALPHA = 0.55f
+        private val FALLING = setOf(Particle.LEAF, Particle.ENVELOPE, Particle.FLOUR, Particle.SNOWFLAKE)
+        private val RISING = setOf(Particle.BUBBLE, Particle.DOT)
         private val DIM = Color(0.17f, 0.12f, 0.25f, 0.55f)
 
         fun wobble(t: Float): Float = MathUtils.sin(t)

@@ -28,10 +28,11 @@ in
     pkgs.git
     # Vulnerability scan of the locked dependencies (see the vuln-scan script).
     pkgs.osv-scanner
-    # Asset generators in tools/ (dev only, never shipped): numpy for gen_audio.py,
-    # rsvg-convert for gen_icon.py.
+    # Asset generators in tools/ (dev only, never shipped): numpy and oggenc for gen_audio.py,
+    # rsvg-convert for gen_icon.py and gen_art.py.
     (pkgs.python3.withPackages (ps: [ ps.numpy ]))
     pkgs.librsvg
+    pkgs.vorbis-tools
   ];
 
   env.SORTOPIA_AVD = avdName;
@@ -54,6 +55,8 @@ in
     "ui-test"
     "vuln-scan"
     "gen-icon"
+    "gen-art"
+    "gen-audio"
   ] (name: { exec = ''${config.devenv.root}/scripts/${name}.sh "$@"''; });
 
   # Linters run before every commit.

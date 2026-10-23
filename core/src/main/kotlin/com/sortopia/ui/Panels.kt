@@ -8,11 +8,14 @@ import com.sortopia.model.Board
 import com.sortopia.model.Item
 import com.sortopia.model.Tube
 import com.sortopia.save.Settings
+import com.sortopia.theme.Look
 
 /** Panels shared between screens and overlays: settings and mechanic explanation cards. */
 class Panels(
     private val game: SortopiaGame,
     private val ui: Widgets,
+    private val theme: WorldTheme = Theme.endless,
+    private val look: Look = Look(theme.def, theme.def.items),
     private val probe: (String, TextButton) -> Unit = { _, _ -> },
 ) {
     private fun str(
@@ -73,7 +76,7 @@ class Panels(
             }
         val titleKey = if (keys.first() == "basics") "mechanic.none" else "mechanic.${keys.first()}"
         panel.add(ui.label(str(titleKey), "title")).padBottom(10f).row()
-        val demo = BoardView(game) { }
+        val demo = BoardView(game, theme, look) { }
         demo.board = demoBoard(mechanics.firstOrNull().takeUnless { all })
         demo.touchable = com.badlogic.gdx.scenes.scene2d.Touchable.disabled
         panel.add(demo).width(DEMO_W).height(DEMO_H).padBottom(10f).row()
