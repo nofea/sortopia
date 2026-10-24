@@ -129,7 +129,7 @@ Each world has its own look (§13): themed items, themed tubes, an illustrated b
 | 8 | Gem Mine | Gems | All mechanics mixed |
 
 ### 6.1 Items per world
-Each world has as many item types as its biggest board needs, plus one spare (†) kept for tuning. Within a world every item has a unique silhouette **and** a clearly different body colour (CIE76 ΔE ≥ 18 between any two). Items are drawn as cute icons with faces (§13).
+Each world has as many item types as its biggest board needs, plus one spare (†) kept for tuning. Within a world every item has a unique silhouette **and** a clearly different body colour (CIE76 ΔE ≥ 18 between any two). Items are drawn as cute icons with faces (§13). A level with N item types uses the first N items of its set, in the order listed, so every type on the board has its own item.
 
 | World | Items (body colour) |
 |---|---|

@@ -5,6 +5,7 @@ import com.sortopia.game.Wallet
 import com.sortopia.model.LevelId
 import com.sortopia.rules.PourResult
 import com.sortopia.solver.Solver
+import com.sortopia.theme.ThemeCatalog
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -54,7 +55,10 @@ class LevelGeneratorTest {
         val tubes = lvl.board.tubes
         val spares = tubes.count { it.isEmpty }
         assertTrue(spares >= p.spares, "at least ${p.spares} spare tubes")
-        assertEquals(p.types, tubes.flatMap { t -> t.items.map { it.type } }.toSet().size)
+        val types = tubes.flatMap { t -> t.items.map { it.type } }.toSet()
+        assertEquals((0 until p.types).toSet(), types, "item types are numbered 0 until types")
+        val look = ThemeCatalog.lookFor(id)
+        assertEquals(types.size, types.map { look.item(it).art }.toSet().size, "every type has its own art")
         assertFalse(tubes.any { it.isComplete }, "no tube starts complete")
         assertFalse(tubes.any { it.top?.hidden == true }, "top items are never hidden")
         if (Mechanic.HIDDEN in p.mechanics) assertTrue(tubes.any { t -> t.items.any { it.hidden } })
@@ -68,6 +72,25 @@ class LevelGeneratorTest {
         for (m in lvl.solution) assertTrue(session.pour(m) is PourResult.Ok)
         assertTrue(session.isSolved)
         assertEquals(lvl.par * GeneratedLevel.PAR_SECONDS_PER_MOVE, lvl.parTimeSeconds)
+    }
+
+    /**
+     * The theme draws type t as its world's item t, so a type beyond the world's item count would
+     * wrap onto another type's art. Checked on raw candidates (no solver) to cover every level.
+     */
+    @Test
+    fun `boards number their item types 0 until types, for every level`() {
+        val params =
+            (1..LevelId.WORLDS).flatMap { w -> (1..LevelId.LEVELS_PER_WORLD).map { LevelGenerator.paramsFor(LevelId.Campaign(w, it)) } } +
+                (1..LevelId.WORLDS).map { LevelGenerator.paramsFor(LevelId.Daily(LocalDate.of(2026, 10, 21), it)) } +
+                listOf(1, 25, 60, 200).map { LevelGenerator.paramsFor(LevelId.Endless(it)) }
+        for (p in params) {
+            for (seed in 0L until 20L) {
+                val board = LevelGenerator.build(p, Rng(seed)) ?: continue
+                val types = board.tubes.flatMap { t -> t.items.map { it.type } + listOfNotNull(t.lockType, t.onlyType) }.toSet()
+                assertEquals((0 until p.types).toSet(), types, "params $p, seed $seed")
+            }
+        }
     }
 
     @Test
@@ -92,9 +115,11 @@ class LevelGeneratorTest {
 
     companion object {
         // Filled from the current generator; update only together with Tuning.GENERATOR_VERSION.
-        const val GOLDEN_1_1 = -1847923358675599864L
-        const val GOLDEN_2_7 = 3554175998770560680L
-        const val GOLDEN_6_3 = -7763656377916272691L
+        // (Last refilled without a bump when types were renumbered 0 until types: same layouts,
+        // pars and solutions, only the type labels changed.)
+        const val GOLDEN_1_1 = -988014381179233662L
+        const val GOLDEN_2_7 = 1718634839432022314L
+        const val GOLDEN_6_3 = -6031330320461122030L
 
         fun fingerprint(level: GeneratedLevel): Long = Rng.seedOf(Solver.key(level.board) + "#" + level.solution)
 
