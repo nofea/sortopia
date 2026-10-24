@@ -71,7 +71,11 @@ class LevelGenerator(
             params: LevelParams,
             rng: Rng,
         ): Board? {
-            val kinds = (0 until ITEM_KINDS).toMutableList().also(rng::shuffle).take(params.types)
+            // Themes draw type t as their item t, so types must be 0 until params.types. Shuffling the
+            // whole pool and ranking the picks keeps the RNG sequence, so layouts are unchanged.
+            val picked = (0 until ITEM_KINDS).toMutableList().also(rng::shuffle).take(params.types)
+            val ranked = picked.sorted()
+            val kinds = picked.map { ranked.indexOf(it) }
             val capacities =
                 kinds.map { if (params.mixedCapacity) rng.nextInt(params.mixedMinHeight, params.height) else params.height }
             var nextId = 0

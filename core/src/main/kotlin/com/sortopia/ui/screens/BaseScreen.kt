@@ -261,7 +261,12 @@ abstract class BaseScreen(
         unprobe("overlay-")
     }
 
+    /** Set once the screen is gone; late background results must then be dropped. */
+    protected var disposed = false
+        private set
+
     override fun dispose() {
+        disposed = true
         unprobe("")
         stage.dispose()
     }

@@ -15,6 +15,7 @@ build-debug      # debug APK
 run-desktop      # play on the desktop launcher (dev only)
 emulator-start   # boot the emulator, then:
 ui-test          # end-to-end UI tests
+ui-sweep         # plays sample levels of every world through the UI (~15 min)
 emulator-stop    # shut the emulator down
 clean            # delete all build outputs
 ```

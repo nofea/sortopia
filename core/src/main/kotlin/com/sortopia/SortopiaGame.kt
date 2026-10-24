@@ -1,5 +1,6 @@
 package com.sortopia
 
+import com.badlogic.gdx.Application
 import com.badlogic.gdx.Game
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input
@@ -22,6 +23,10 @@ import com.sortopia.ui.screens.SplashScreen
 import java.io.IOException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.PriorityBlockingQueue
+import java.util.concurrent.ThreadFactory
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 class SortopiaGame(
     val platform: Platform,
@@ -45,13 +50,27 @@ class SortopiaGame(
     val probe: UiProbe get() = UiProbe.current
 
     private val cache = LinkedHashMap<String, GeneratedLevel>(CACHE_SIZE, LOAD_FACTOR, true)
-    private val pending = HashMap<String, MutableList<(GeneratedLevel) -> Unit>>()
-    private val levelExecutor: ExecutorService = daemonExecutor("level-gen")
-    val workExecutor: ExecutorService = daemonExecutor("solver")
+    private val pending = HashMap<String, LevelJob>()
+    private val levelQueue = PriorityBlockingQueue<Runnable>()
+    private val levelExecutor: ExecutorService =
+        ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, levelQueue, daemonThreads("level-gen"))
+    private var jobCount = 0L
+
+    // Background work isn't interruptible, so it can outlive this game: once the activity is
+    // destroyed (Android doesn't always call dispose), Gdx.app belongs to the next activity in the
+    // same process, and late results must not reach this game's screens.
+    @Volatile
+    private var app: Application? = null
+
+    @Volatile
+    private var disposed = false
+
+    val workExecutor: ExecutorService = Executors.newSingleThreadExecutor(daemonThreads("solver"))
 
     val settings: Settings get() = progress.data.settings
 
     override fun create() {
+        app = Gdx.app
         Gdx.input.setCatchKey(Input.Keys.BACK, true)
         batch = SpriteBatch()
         shapes = ShapeRenderer()
@@ -90,34 +109,43 @@ class SortopiaGame(
         audio.refreshMusic()
     }
 
-    /** Delivers the generated level on the render thread; generation runs in the background. */
+    /**
+     * Delivers the generated level on the render thread; generation runs in the background.
+     * An [urgent] request (a level the player opened) is generated before queued prefetches,
+     * which on a slow device can take tens of seconds each.
+     */
     fun level(
         id: LevelId,
+        urgent: Boolean = true,
         onReady: (GeneratedLevel) -> Unit,
     ) {
         cache[id.key]?.let {
             onReady(it)
             return
         }
-        val waiting = pending[id.key]
-        if (waiting != null) {
-            waiting += onReady
-            return
+        val job = pending[id.key]
+        when {
+            job == null -> enqueue(LevelJob(id, urgent, jobCount++), onReady)
+            // Still queued as a prefetch: requeue it ahead of the other prefetches.
+            urgent && !job.urgent && levelQueue.remove(job) -> enqueue(LevelJob(id, true, job.order), onReady, job.waiting)
+            else -> job.waiting += onReady
         }
-        pending[id.key] = mutableListOf(onReady)
-        levelExecutor.execute {
-            val level = LevelGenerator().generate(id)
-            Gdx.app.postRunnable {
-                cache[id.key] = level
-                while (cache.size > CACHE_SIZE) cache.remove(cache.keys.first())
-                pending.remove(id.key)?.forEach { it(level) }
-            }
-        }
+    }
+
+    private fun enqueue(
+        job: LevelJob,
+        onReady: (GeneratedLevel) -> Unit,
+        earlier: List<(GeneratedLevel) -> Unit> = emptyList(),
+    ) {
+        job.waiting += earlier
+        job.waiting += onReady
+        pending[job.id.key] = job
+        levelExecutor.execute(job)
     }
 
     /** Generates [id] ahead of time so the next level opens instantly. */
     fun prefetch(id: LevelId?) {
-        if (id != null && id.key !in cache && id.key !in pending) level(id) {}
+        if (id != null && id.key !in cache && id.key !in pending) level(id, urgent = false) {}
     }
 
     /** Prefetches [ids] and calls [onDone] on the render thread once all of them are generated. */
@@ -132,7 +160,7 @@ class SortopiaGame(
         }
         var left = distinct.size
         for (id in distinct) {
-            level(id) { if (--left == 0) onDone() }
+            level(id, urgent = false) { if (--left == 0) onDone() }
         }
     }
 
@@ -147,7 +175,13 @@ class SortopiaGame(
         audio.refreshMusic()
     }
 
+    /** Runs [block] on the render thread, unless this game is no longer the running one by then. */
+    fun onRenderThread(block: () -> Unit) {
+        Gdx.app.postRunnable { if (!disposed && Gdx.app === app) block() }
+    }
+
     override fun dispose() {
+        disposed = true
         screen?.dispose()
         save()
         levelExecutor.shutdownNow()
@@ -163,12 +197,37 @@ class SortopiaGame(
         private const val CACHE_SIZE = 6
         private const val LOAD_FACTOR = 0.75f
 
-        private fun daemonExecutor(name: String): ExecutorService =
-            Executors.newSingleThreadExecutor { r ->
+        private fun daemonThreads(name: String) =
+            ThreadFactory { r ->
                 Thread(r, name).apply {
                     isDaemon = true
                     priority = Thread.NORM_PRIORITY - 1
                 }
             }
+    }
+
+    /**
+     * One level to generate. The queue runs urgent jobs first, then in request [order]; [waiting]
+     * is only touched on the render thread.
+     */
+    private inner class LevelJob(
+        val id: LevelId,
+        val urgent: Boolean,
+        val order: Long,
+    ) : Runnable,
+        Comparable<LevelJob> {
+        val waiting = mutableListOf<(GeneratedLevel) -> Unit>()
+
+        override fun compareTo(other: LevelJob) = compareValuesBy(this, other, { !it.urgent }, { it.order })
+
+        override fun run() {
+            val level = LevelGenerator().generate(id)
+            onRenderThread {
+                cache[id.key] = level
+                while (cache.size > CACHE_SIZE) cache.remove(cache.keys.first())
+                if (pending[id.key] === this) pending.remove(id.key)
+                waiting.forEach { it(level) }
+            }
+        }
     }
 }

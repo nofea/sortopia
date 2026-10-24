@@ -69,6 +69,9 @@ class BoardView(
     private val tmpMatrix2 = Matrix4()
     private val texts = ArrayList<TextDraw>()
 
+    /** Debug UI-test bridge only: what each tube showed this frame (see [record]). */
+    private val drawn = ArrayList<StringBuilder>()
+
     private class Flight(
         val item: Item,
         val fromX: Float,
@@ -203,8 +206,10 @@ class BoardView(
         val oldTransform = tmpMatrix.set(batch.transformMatrix)
         batch.transformMatrix = tmpMatrix2.set(oldTransform).translate(x, y, 0f)
         texts.clear()
+        startRecording()
         val flying = flights.mapTo(HashSet()) { it.item.id }
         board.tubes.forEachIndexed { i, tube -> drawTube(batch, i, tube, flying) }
+        publishRecording()
         for (f in flights) drawFlight(batch, f)
         pointer?.let { drawPointer(batch, it) }
         for (t in texts) {
@@ -213,6 +218,38 @@ class BoardView(
             t.font.draw(batch, t.text, t.x - glyphs.width / 2, t.y + glyphs.height / 2)
         }
         batch.transformMatrix = oldTransform
+    }
+
+    private val recording get() = game.probe.active
+
+    private fun startRecording() {
+        if (!recording) return
+        while (drawn.size < board.tubes.size) drawn += StringBuilder()
+        for (sb in drawn) sb.setLength(0)
+    }
+
+    /**
+     * Notes, as the board is drawn, that tube [tube] showed [what] ("item", "label" or "lock") for
+     * item [type]: "what=type:art#RRGGBB", or "?" for a face-down item. UI tests compare these
+     * with the types to catch two types that look alike (or one type drawn two ways).
+     */
+    private fun record(
+        tube: Int,
+        what: String,
+        type: Int,
+        hidden: Boolean = false,
+    ) {
+        if (!recording) return
+        val sb = drawn.getOrNull(tube) ?: return
+        if (sb.isNotEmpty()) sb.append(' ')
+        sb.append(what).append('=').append(type).append(':')
+        sb.append(if (hidden) "?" else ItemArt.appearance(look, type, colorblind))
+    }
+
+    /** One line per tube, published only for settled frames (no items in flight). */
+    private fun publishRecording() {
+        if (!recording || flights.isNotEmpty()) return
+        game.probe.state("drawn", drawn.take(board.tubes.size).joinToString("\n"))
     }
 
     private fun shakeOffset(i: Int): Float {
@@ -253,8 +290,14 @@ class BoardView(
         TubeArt.shine(batch, game.assets.white, r)
         TubeArt.collar(batch, art, theme, r, itemSize)
         if (tube.isComplete) drawLid(batch, i, r)
-        tube.onlyType?.let { drawLabel(batch, it, r) }
-        tube.lockType?.let { drawLock(batch, it, r) }
+        tube.onlyType?.let {
+            drawLabel(batch, it, r)
+            record(i, "label", it)
+        }
+        tube.lockType?.let {
+            drawLock(batch, it, r)
+            record(i, "lock", it)
+        }
     }
 
     private fun drawItems(
@@ -272,6 +315,7 @@ class BoardView(
             val bob = if (k >= liftFrom && !reduceMotion) sin(time * 5f) * 2f else 0f
             val cy = r.y + pad + itemSize * (k + 0.5f) + if (k >= liftFrom) lift + bob else 0f
             drawItem(batch, item, cx, cy)
+            record(i, "item", item.type, item.hidden)
             if (item.gluedUp && k + 1 < tube.size) sprite(batch, "ov.glue", cx, cy + itemSize * 0.5f, itemSize * 0.62f)
         }
     }
