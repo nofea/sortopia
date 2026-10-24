@@ -144,7 +144,10 @@ class GameScreen(
         return probe("helper-$pid", b)
     }
 
-    private fun start(level: GeneratedLevel) = start(level, replaySaved = true)
+    private fun start(level: GeneratedLevel) {
+        // The player left before the level was generated.
+        if (!disposed) start(level, replaySaved = true)
+    }
 
     private fun start(
         level: GeneratedLevel,
@@ -298,7 +301,7 @@ class GameScreen(
             val snapshot = solveNext.getAndSet(null) ?: return@execute
             val r = Solver().solve(snapshot)
             val text = (r as? Solver.Result.Solved)?.moves?.joinToString(",") { "${it.from}>${it.to}" } ?: "none"
-            com.badlogic.gdx.Gdx.app.postRunnable { if (session?.board == snapshot) game.probe.state("solution", text) }
+            game.onRenderThread { if (!disposed && session?.board == snapshot) game.probe.state("solution", text) }
         }
     }
 
@@ -414,7 +417,8 @@ class GameScreen(
         val snapshot = s.board
         game.workExecutor.execute {
             val move = Solver().hint(snapshot)
-            com.badlogic.gdx.Gdx.app.postRunnable {
+            game.onRenderThread {
+                if (disposed) return@onRenderThread
                 hintPending = false
                 when (val r = s.applyHint(snapshot, move)) {
                     is HelperResult.Hint -> {

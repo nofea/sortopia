@@ -195,7 +195,13 @@ class GameDriver {
 
     fun solution(): List<Pair<Int, Int>> {
         val text = state("solution")!!
-        return text.split(",").map { m -> m.split(">").let { it[0].toInt() to it[1].toInt() } }
+        val moves = text.split(",").map { m -> m.split(">").let { it[0].toInt() to it[1].toInt() } }
+        // A solution for another board (e.g. a late result from the previous test) would pour from
+        // tubes this level doesn't have.
+        val tubes = state("tubes")!!.toInt()
+        val bad = moves.firstOrNull { (from, to) -> from >= tubes || to >= tubes }
+        assertEquals("${state("level")}: solution move $bad doesn't fit a board of $tubes tubes", null, bad)
+        return moves
     }
 
     fun pour(
@@ -245,7 +251,7 @@ class GameDriver {
         const val DEFAULT_TIMEOUT = 15_000L
         const val LAUNCH_TIMEOUT = 30_000L
 
-        // e-21 alone takes ~1 min to generate and solve on a local emulator, and CI is slower.
+        // A big Endless board can take a minute to generate and solve on a local emulator, and CI is slower.
         const val GENERATION_TIMEOUT = 240_000L
         private const val POLL_MS = 100L
         private const val TAP_SETTLE_MS = 150L

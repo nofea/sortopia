@@ -73,8 +73,11 @@ class LevelSweepUiTest(
     companion object {
         private val SAMPLE_LEVELS = listOf(1, 10, LevelId.LEVELS_PER_WORLD)
 
-        /** First level of each Endless mix (SPEC §6.1: the mix changes every 10 levels). */
-        private val ENDLESS_LEVELS = listOf(1, 11, 21)
+        /**
+         * One level of each Endless mix (SPEC §6.1: the mix changes every 10 levels). The third is
+         * e-22, not e-21: e-21 takes 22 generation attempts, several minutes on a CI emulator.
+         */
+        private val ENDLESS_LEVELS = listOf(1, 11, 22)
 
         private fun campaign(
             world: Int,

@@ -1,5 +1,6 @@
 package com.sortopia
 
+import com.badlogic.gdx.Application
 import com.badlogic.gdx.Game
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input
@@ -54,11 +55,22 @@ class SortopiaGame(
     private val levelExecutor: ExecutorService =
         ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, levelQueue, daemonThreads("level-gen"))
     private var jobCount = 0L
+
+    // Background work isn't interruptible, so it can outlive this game: once the activity is
+    // destroyed (Android doesn't always call dispose), Gdx.app belongs to the next activity in the
+    // same process, and late results must not reach this game's screens.
+    @Volatile
+    private var app: Application? = null
+
+    @Volatile
+    private var disposed = false
+
     val workExecutor: ExecutorService = Executors.newSingleThreadExecutor(daemonThreads("solver"))
 
     val settings: Settings get() = progress.data.settings
 
     override fun create() {
+        app = Gdx.app
         Gdx.input.setCatchKey(Input.Keys.BACK, true)
         batch = SpriteBatch()
         shapes = ShapeRenderer()
@@ -163,7 +175,13 @@ class SortopiaGame(
         audio.refreshMusic()
     }
 
+    /** Runs [block] on the render thread, unless this game is no longer the running one by then. */
+    fun onRenderThread(block: () -> Unit) {
+        Gdx.app.postRunnable { if (!disposed && Gdx.app === app) block() }
+    }
+
     override fun dispose() {
+        disposed = true
         screen?.dispose()
         save()
         levelExecutor.shutdownNow()
@@ -204,7 +222,7 @@ class SortopiaGame(
 
         override fun run() {
             val level = LevelGenerator().generate(id)
-            Gdx.app.postRunnable {
+            onRenderThread {
                 cache[id.key] = level
                 while (cache.size > CACHE_SIZE) cache.remove(cache.keys.first())
                 if (pending[id.key] === this) pending.remove(id.key)
