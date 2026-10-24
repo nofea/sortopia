@@ -56,7 +56,8 @@ All local work happens inside **devenv** ([devenv.sh](https://devenv.sh)). Nothi
 | `gen-icon` | Regenerates the launcher icon layers, the store icon and a mask preview (`tools/gen_icon.py`) |
 | `gen-art` | Regenerates the in-game art: item, dressing, overlay and particle sheets, the atlas index, and the world backgrounds (`tools/gen_art.py`; `--svg <dir>` keeps the SVG sources) |
 | `gen-audio` | Regenerates the SFX and the lo-fi music loops (`tools/gen_audio.py`); pass track names (e.g. `world1 menu`) to make only those |
-| `ui-test` | `:android:connectedDebugAndroidTest` on the running emulator |
+| `ui-test` | `:android:connectedDebugAndroidTest` on the running emulator, without the level sweep |
+| `ui-sweep` | Only the level sweep (`LevelSweepUiTest`, ~15 min): plays levels 1, 10 and 20 of every world, the Daily, each Endless mix and the colorblind palette |
 | `vuln-scan` | OSV scan: fails on vulnerable **shipped** dependencies (`android/gradle.lockfile`); build tooling is informational only |
 
 Each devenv script is a thin wrapper around `scripts/<name>.sh`, where the commands actually live, so CI can run them without devenv. Edit the `.sh` file, not `devenv.nix`. The scripts run from the repo root. They are not called `test`, because that would shadow the shell builtin.
@@ -94,7 +95,9 @@ Other useful commands:
   - Tests send real taps through UI Automator and assert on that state, using screenshots where useful.
   - The bridge lives only in the debug source set and must never compile into release.
   - Cover at least: the tutorial, solving a level to completion, helpers spending points, world unlocking, settings toggles, and save/restore across an app restart.
-- A change is done when `lint` and `unit-test` pass. `ui-test` must also pass for changes to screens, input, or persistence.
+  - Tests check what is **drawn**, not just the logic state: `BoardView` reports each tube's drawn items to the bridge. `GameDriver` asserts that two visible items look alike exactly when they are the same type, and that each pour looks legal from the pictures.
+  - Screenshots (`GameDriver.screenshot`, plus `FAILED-<test>.png` on failure) land in `android/build/outputs/connected_android_test_additional_output/`; CI uploads them with the reports.
+- A change is done when `lint` and `unit-test` pass. `ui-test` must also pass for changes to screens, input, or persistence, and `ui-sweep` for changes to the generator, themes or board rendering.
 
 ## CI (GitHub Actions)
 - Workflow: `.github/workflows/ci.yml`. All actions are pinned to commit SHAs.
@@ -104,7 +107,7 @@ Other useful commands:
   - debug build
   - dependency vulnerability scan (`vuln-scan`, OSV)
   - Gradle wrapper validation
-- **PRs to `main`:** also run the emulator UI tests.
+- **PRs to `main`:** also run the emulator UI tests: `ui-test` and `ui-sweep` as two parallel matrix jobs.
 - CI does **not** use devenv. Jobs run on the plain `ubuntu-latest` runner and call the same `scripts/*.sh` as the devenv commands, for parity.
   - `.github/actions/setup-toolchain` installs JDK 17 (Temurin), the Android SDK packages (platform 36, build-tools 36.0.0, platform tools; the emulator and system image for UI tests) and osv-scanner (a pinned release binary, SHA-256 checked).
   - These versions must match `devenv.nix` and `android/build.gradle.kts`: change them together.

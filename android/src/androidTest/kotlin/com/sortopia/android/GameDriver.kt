@@ -5,6 +5,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import com.sortopia.save.SaveData
 import com.sortopia.save.SaveStore
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.fail
 import java.io.File
@@ -83,11 +85,20 @@ class GameDriver {
 
     fun state(key: String): String? = DebugTestBridge.state(key)
 
-    /** Saves a screenshot to the app's external cache (pull with adb) for visual review. */
+    /**
+     * Saves a screenshot for visual review. Gradle pulls AGP's additional test output directory
+     * into `android/build/outputs/connected_android_test_additional_output/` before it
+     * uninstalls the app; without that argument (e.g. `am instrument`) it goes to the external cache.
+     */
     fun screenshot(name: String) {
-        val dir = context.externalCacheDir ?: return
+        val dir = screenshotDir() ?: return
         Thread.sleep(SCREENSHOT_SETTLE_MS)
         device.takeScreenshot(File(dir, "$name.png"))
+    }
+
+    private fun screenshotDir(): File? {
+        val extra = InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")?.let(::File)
+        return extra?.takeIf { it.isDirectory || it.mkdirs() } ?: context.externalCacheDir
     }
 
     fun tap(id: String) {
@@ -129,6 +140,57 @@ class GameDriver {
         if (state("overlay") == "tips") tap("overlay-tips-ok")
         if (state("overlay") == "card") tap("overlay-card-ok")
         waitUntil("no overlay") { state("overlay").isNullOrEmpty() }
+        assertBoardReadable()
+    }
+
+    /** One item, label or padlock icon as the board drew it: its true [type] and its [look]. */
+    data class Drawn(
+        val type: Int,
+        val look: String,
+    ) {
+        val hidden: Boolean get() = look == HIDDEN
+    }
+
+    /** What one tube showed, bottom to top, with its single-type label and padlock icons. */
+    data class DrawnTube(
+        val items: List<Drawn>,
+        val label: Drawn?,
+        val lock: Drawn?,
+    )
+
+    /** The board as last drawn on a settled frame (published by BoardView). */
+    fun drawn(): List<DrawnTube> {
+        val text = state("drawn") ?: return emptyList()
+        return text.split("\n").map { line ->
+            val fields =
+                line.split(' ').filter { it.isNotEmpty() }.map { field ->
+                    val (what, rest) = field.split('=', limit = 2)
+                    val (type, look) = rest.split(':', limit = 2)
+                    what to Drawn(type.toInt(), look)
+                }
+            DrawnTube(
+                items = fields.filter { it.first == "item" }.map { it.second },
+                label = fields.firstOrNull { it.first == "label" }?.second,
+                lock = fields.firstOrNull { it.first == "lock" }?.second,
+            )
+        }
+    }
+
+    /**
+     * What the player sees must match the rules: two visible items (or label/padlock icons) look
+     * the same exactly when they are the same type. Catches a type drawn with another's art.
+     */
+    fun assertBoardReadable() {
+        waitUntil("board drawn") { drawn().size == state("tubes")?.toInt() }
+        val shown = drawn().flatMap { t -> t.items + listOfNotNull(t.label, t.lock) }.filterNot { it.hidden }
+        for ((look, same) in shown.groupBy { it.look }) {
+            val types = same.map { it.type }.toSortedSet()
+            assertEquals("types $types on ${state("level")} are all drawn as $look", 1, types.size)
+        }
+        for ((type, same) in shown.groupBy { it.type }) {
+            val looks = same.map { it.look }.toSortedSet()
+            assertEquals("type $type on ${state("level")} is drawn as $looks", 1, looks.size)
+        }
     }
 
     fun solution(): List<Pair<Int, Int>> {
@@ -142,10 +204,34 @@ class GameDriver {
     ) {
         val before = state("moves")!!.toInt()
         waitUntil("animation done") { state("animating") == "false" }
+        assertPourLooksLegal(from, to)
         tap("tube-$from")
         waitUntil("tube $from selected") { state("selected") == from.toString() }
         tap("tube-$to")
         waitUntil("move counted") { state("moves")!!.toInt() == before + 1 }
+        waitUntil("animation done") { state("animating") == "false" }
+        assertBoardReadable()
+    }
+
+    /**
+     * A player would only try this pour if the pictures allow it (SPEC §3): the source's top item
+     * looks like the target's top item, or the target is empty, and it fits the target's label.
+     */
+    private fun assertPourLooksLegal(
+        from: Int,
+        to: Int,
+    ) {
+        val tubes = drawn()
+        val level = state("level")
+        val top = tubes[from].items.lastOrNull()
+        assertNotNull("$level: tube $from looks empty but the solution pours from it", top)
+        assertNotEquals("$level: tube $from's top item is face-down", HIDDEN, top!!.look)
+        tubes[to].items.lastOrNull()?.let {
+            assertEquals("$level: pouring $from>$to, but the tops look different", it.look, top.look)
+        }
+        tubes[to].label?.let {
+            assertEquals("$level: pouring $from>$to, but tube $to's label shows another item", it.look, top.look)
+        }
     }
 
     /** Plays the solver's solution from the current board to completion. */
@@ -155,6 +241,7 @@ class GameDriver {
     }
 
     companion object {
+        private const val HIDDEN = "?"
         const val DEFAULT_TIMEOUT = 15_000L
         const val LAUNCH_TIMEOUT = 30_000L
         const val GENERATION_TIMEOUT = 60_000L

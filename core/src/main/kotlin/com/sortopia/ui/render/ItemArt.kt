@@ -21,9 +21,22 @@ object ItemArt {
         type: Int,
         colorblind: Boolean,
     ): Color {
-        val hex = if (colorblind) ThemeCatalog.colorblindColor(type) else look.item(type).color
+        val hex = hex(look, type, colorblind)
         return colors.getOrPut(hex) { Color.valueOf(hex) }
     }
+
+    /** What [draw] shows for item [type], as "art#RRGGBB" (reported to the debug UI-test bridge). */
+    fun appearance(
+        look: Look,
+        type: Int,
+        colorblind: Boolean,
+    ): String = "${look.item(type).art}#${hex(look, type, colorblind)}"
+
+    private fun hex(
+        look: Look,
+        type: Int,
+        colorblind: Boolean,
+    ): String = if (colorblind) ThemeCatalog.colorblindColor(type) else look.item(type).color
 
     /** Draws item [type] in a [size]-wide cell centred on ([cx], [cy]); the art fills about 80% of it. */
     @Suppress("LongParameterList")

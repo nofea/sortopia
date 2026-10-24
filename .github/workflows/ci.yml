@@ -44,11 +44,16 @@ jobs:
           retention-days: 7
 
   ui-tests:
-    # Emulator UI tests only for PRs into main (CLAUDE.md, CI).
+    # Emulator UI tests only for PRs into main (CLAUDE.md, CI). The long level sweep runs as its
+    # own matrix job, on its own emulator, in parallel with the rest of the UI tests.
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
     needs: checks
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [ui-test, ui-sweep]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-toolchain
@@ -62,11 +67,14 @@ jobs:
       - name: Boot emulator
         run: scripts/emulator-start.sh -no-window
       - name: Emulator UI tests
-        run: scripts/ui-test.sh
+        run: scripts/${{ matrix.suite }}.sh
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ui-test-reports
-          path: android/build/reports/androidTests/
+          name: ${{ matrix.suite }}-reports
+          # Test reports, plus the screenshots the tests save (GameDriver.screenshot).
+          path: |
+            android/build/reports/androidTests/
+            android/build/outputs/connected_android_test_additional_output/
           retention-days: 7

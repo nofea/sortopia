@@ -6,12 +6,14 @@ import com.sortopia.gen.Tuning
 import com.sortopia.model.LevelId
 import com.sortopia.save.SaveData
 import com.sortopia.save.SaveStore
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TestWatcher
+import org.junit.runner.Description
 import org.junit.runner.RunWith
 import java.io.File
 
@@ -25,10 +27,17 @@ class SortopiaUiTest {
         d.clearSave()
     }
 
-    @After
-    fun tearDown() {
-        d.close()
-    }
+    /** Screenshots a failing test before the app closes, so CI keeps the evidence. */
+    @get:Rule
+    val closeApp =
+        object : TestWatcher() {
+            override fun failed(
+                e: Throwable?,
+                description: Description,
+            ) = d.screenshot("FAILED-${description.methodName}")
+
+            override fun finished(description: Description) = d.close()
+        }
 
     private fun openLevel(
         world: Int,
@@ -138,6 +147,7 @@ class SortopiaUiTest {
         d.waitOverlay("card", GameDriver.GENERATION_TIMEOUT)
         d.screenshot("world2-card")
         d.tap("overlay-card-ok")
+        d.assertBoardReadable()
         d.screenshot("world2-level1")
         assertEquals(LevelId.Campaign(2, 1).key, d.state("level"))
     }
@@ -207,6 +217,7 @@ class SortopiaUiTest {
         d.tap("overlay-resume-yes")
         d.waitScreen("game")
         d.waitUntil("level restored", GameDriver.GENERATION_TIMEOUT) { d.state("moves") == "1" }
+        d.assertBoardReadable()
     }
 
     @Test

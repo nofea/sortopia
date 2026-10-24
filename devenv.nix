@@ -54,6 +54,7 @@ in
     "emulator-start"
     "emulator-stop"
     "ui-test"
+    "ui-sweep"
     "vuln-scan"
     "gen-icon"
     "gen-art"
