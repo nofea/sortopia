@@ -244,7 +244,9 @@ class GameDriver {
         private const val HIDDEN = "?"
         const val DEFAULT_TIMEOUT = 15_000L
         const val LAUNCH_TIMEOUT = 30_000L
-        const val GENERATION_TIMEOUT = 60_000L
+
+        // e-21 alone takes ~1 min to generate and solve on a local emulator, and CI is slower.
+        const val GENERATION_TIMEOUT = 240_000L
         private const val POLL_MS = 100L
         private const val TAP_SETTLE_MS = 150L
         private const val SCREENSHOT_SETTLE_MS = 700L

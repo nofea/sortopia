@@ -19,6 +19,7 @@ import com.sortopia.game.Helpers
 import com.sortopia.game.SolveOutcome
 import com.sortopia.gen.GeneratedLevel
 import com.sortopia.gen.Tuning
+import com.sortopia.model.Board
 import com.sortopia.model.LevelId
 import com.sortopia.model.Move
 import com.sortopia.platform.Haptic
@@ -33,6 +34,7 @@ import com.sortopia.ui.Panels
 import com.sortopia.ui.Sfx
 import com.sortopia.ui.Theme
 import com.sortopia.ui.WorldTheme
+import java.util.concurrent.atomic.AtomicReference
 
 /** Gameplay (SPEC §2, §4, §11, §12). [resume] replays a level left mid-play. */
 class GameScreen(
@@ -62,11 +64,12 @@ class GameScreen(
     private var tutorialSealedShown = false
     private var hintPending = false
     private var completeQueued = false
+    private val solveNext = AtomicReference<Board?>()
 
     init {
         buildLayout()
         game.audio.playMusic(theme.def.track)
-        game.level(id, ::start)
+        game.level(id, onReady = ::start)
     }
 
     private fun levelTitle(): String =
@@ -281,12 +284,18 @@ class GameScreen(
         game.probe.element(pid, x0, y0, tmp.x - x0, tmp.y - y0)
     }
 
-    /** Test-only: the solver's solution from the current board, published for the UI tests. */
+    /**
+     * Test-only: the solver's solution from the current board, published for the UI tests. Only the
+     * latest board is solved: a big board can take seconds per solve on a slow device, so one solve
+     * per move would pile up behind the player.
+     */
     private fun publishSolution() {
         if (!game.probe.active) return
         val s = session ?: return
-        val snapshot = s.board
+        // A solve is already queued; it picks up this board when it starts.
+        if (solveNext.getAndSet(s.board) != null) return
         game.workExecutor.execute {
+            val snapshot = solveNext.getAndSet(null) ?: return@execute
             val r = Solver().solve(snapshot)
             val text = (r as? Solver.Result.Solved)?.moves?.joinToString(",") { "${it.from}>${it.to}" } ?: "none"
             com.badlogic.gdx.Gdx.app.postRunnable { if (session?.board == snapshot) game.probe.state("solution", text) }
