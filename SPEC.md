@@ -284,7 +284,8 @@ Splash → World Map ─┬→ Level Select → Gameplay → Level Complete ─�
                     │                     ↕ Pause menu           ├→ Replay
                     ├→ Daily Puzzle → Gameplay                    └→ Level Select
                     ├→ Endless Select → Gameplay
-                    └→ Settings
+                    ├→ Settings
+                    └→ About
 ```
 
 - **Splash:** shown on a **cold start only** (returning from the background resumes where the player was). It doubles as the loading screen and can't be skipped.
@@ -305,6 +306,7 @@ Splash → World Map ─┬→ Level Select → Gameplay → Level Complete ─�
 - **Pause menu:** resume, restart, mechanic help card, settings, quit to level select.
 - **Level Complete:** score breakdown (moves vs par, time vs parTime), stars earned (animated), points added to the wallet, new-best indicator, and buttons for Next / Replay / Levels.
 - **Settings:** see §14.
+- **About:** opened from the World Map header (the "i" button beside Settings). Shows the game name, the creator ("Created by Sheen Games"), the installed app version (the Android `versionName`) and the font credit, with a Back button to the World Map.
 - **Safe area:** the game draws edge to edge. The world background fills the whole screen, but every screen's content and overlays stay inside the display's safe area, so camera cutouts (hole-punch, notch) and rounded corners never hide the HUD or buttons.
 
 ---

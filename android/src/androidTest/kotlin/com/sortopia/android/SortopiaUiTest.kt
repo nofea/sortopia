@@ -204,6 +204,19 @@ class SortopiaUiTest {
     }
 
     @Test
+    fun aboutShowsTheInstalledVersion() {
+        d.launch()
+        d.tap("about")
+        d.waitScreen("about")
+        @Suppress("DEPRECATION") // The PackageInfoFlags overload needs API 33; minSdk is 26.
+        val expected = d.context.packageManager.getPackageInfo(d.context.packageName, 0).versionName
+        assertEquals(expected, d.state("about-version"))
+        d.screenshot("about")
+        d.tap("about-back")
+        d.waitScreen("map")
+    }
+
+    @Test
     fun levelInProgressSurvivesAppRestart() {
         d.launch()
         openLevel(1, 1)

@@ -42,7 +42,9 @@ class WorldMapScreen(
                     },
                 ).size(30f)
             }
-        header.add(probe("settings", gear)).size(56f).padLeft(12f)
+        val info = ui.button("i") { game.go(AboutScreen(game)) }
+        header.add(probe("about", info)).size(56f).padLeft(12f)
+        header.add(probe("settings", gear)).size(56f).padLeft(8f)
         root.top().pad(12f)
         root.add(header).expandX().fillX().padBottom(8f).row()
 
@@ -364,6 +366,35 @@ class SettingsScreen(
     init {
         val panels = Panels(game, ui) { pid, b -> probe(pid, b) }
         root.add(panels.settings { onBack() }).width(VIRTUAL_WIDTH - 48f)
+    }
+
+    override fun onBack() = game.go(WorldMapScreen(game))
+}
+
+/** Who made the game and which version is installed (SPEC §12). */
+class AboutScreen(
+    game: SortopiaGame,
+) : BaseScreen(game) {
+    override val probeName = "about"
+
+    init {
+        val version = game.platform.appVersion
+        game.probe.state("about-version", version)
+        val panel = ui.panel()
+        panel.add(ui.label(str("about.title"), "title")).padBottom(16f).row()
+        panel.add(ui.label(str("map.title"), "title")).padBottom(8f).row()
+        panel.add(ui.label(str("about.creator"), wrap = true)).fillX().padBottom(8f).row()
+        panel.add(ui.label(str("about.version", version), "soft", wrap = true)).fillX().padBottom(8f).row()
+        panel.add(ui.label(str("settings.credits"), "small", wrap = true)).fillX().padTop(12f).row()
+        panel.add(
+            probe(
+                "about-back",
+                ui.button(str("common.back"), "primary") {
+                    onBack()
+                },
+            ),
+        ).width(Panels.WIDE_W).height(Panels.BUTTON_H).padTop(16f)
+        root.add(panel).width(VIRTUAL_WIDTH - 48f)
     }
 
     override fun onBack() = game.go(WorldMapScreen(game))

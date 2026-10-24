@@ -16,6 +16,9 @@ interface Platform {
 
     val macProvider: MacProvider
 
+    /** The app's version name, shown on the About screen. */
+    val appVersion: String
+
     /** System font scale, clamped by the caller to what the layout allows. */
     val fontScale: Float get() = 1f
 
