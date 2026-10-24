@@ -33,6 +33,9 @@ private class DesktopPlatform : Platform {
         }
     }
 
+    /** The desktop launcher is never shipped, so it has no release version. */
+    override val appVersion = "dev"
+
     /** Desktop has no haptics. */
     override fun haptic(kind: Haptic) = Unit
 

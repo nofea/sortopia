@@ -23,7 +23,11 @@ class Panels(
         vararg args: Any,
     ) = game.assets.str(key, *args)
 
-    fun settings(onClose: () -> Unit): Table {
+    /** The settings panel; [onClearProgress] adds the Clear progress button (World Map only, SPEC §14). */
+    fun settings(
+        onClose: () -> Unit,
+        onClearProgress: (() -> Unit)? = null,
+    ): Table {
         val panel = ui.panel()
         panel.add(ui.label(str("settings.title"), "title")).padBottom(16f).row()
 
@@ -55,6 +59,11 @@ class Panels(
         toggle("colorblind", "settings.colorblind", { it.colorblindPalette }) { s, v -> s.copy(colorblindPalette = v) }
         toggle("reducemotion", "settings.reducemotion", { it.reduceMotion }) { s, v -> s.copy(reduceMotion = v) }
         panel.add(ui.label(str("settings.credits"), "small", wrap = true)).fillX().padTop(12f).row()
+        if (onClearProgress != null) {
+            val clear = ui.button(str("settings.clear"), "danger", onClearProgress)
+            probe("setting-clear", clear)
+            panel.add(clear).width(WIDE_W).height(BUTTON_H).padTop(16f).row()
+        }
         val close = ui.button(str("common.back"), "primary", onClose)
         probe("settings-back", close)
         panel.add(close).width(WIDE_W).height(BUTTON_H).padTop(16f)

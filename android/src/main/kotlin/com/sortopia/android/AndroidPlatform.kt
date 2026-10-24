@@ -1,5 +1,6 @@
 package com.sortopia.android
 
+import android.content.pm.PackageManager
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -26,6 +27,17 @@ class AndroidPlatform(
     override val saveDir: Path = app.filesDir.toPath().resolve("save")
 
     override val macProvider: MacProvider by lazy { KeystoreMac.create(app.noBackupFilesDir) }
+
+    override val appVersion: String by lazy {
+        val info =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                app.packageManager.getPackageInfo(app.packageName, PackageManager.PackageInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                app.packageManager.getPackageInfo(app.packageName, 0)
+            }
+        info.versionName.orEmpty()
+    }
 
     override val fontScale: Float get() = app.resources.configuration.fontScale
 
