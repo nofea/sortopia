@@ -518,7 +518,7 @@ class GameScreen(
         entry("resume", "pause.resume", "primary") { closeOverlay() }
         entry("restart", "pause.restart") { restart() }
         entry("help", "pause.help") { showHelp() }
-        entry("settings", "pause.settings") { showOverlay("settings", panels.settings { openPauseAgain() }) }
+        entry("settings", "pause.settings") { showOverlay("settings", panels.settings(onClose = { openPauseAgain() })) }
         entry("quit", "pause.quit") { quit() }
         showOverlay("pause", panel)
     }

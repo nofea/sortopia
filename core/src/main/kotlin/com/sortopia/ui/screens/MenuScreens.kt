@@ -21,6 +21,7 @@ import com.sortopia.ui.WorldTheme
 
 class WorldMapScreen(
     game: SortopiaGame,
+    private val cleared: Boolean = false,
 ) : BaseScreen(game) {
     override val probeName = "map"
     private val progress get() = game.progress
@@ -146,30 +147,45 @@ class WorldMapScreen(
         }
     }
 
-    /** Save-reset notice first (SPEC §16), then the offer to resume an unfinished level (SPEC §15). */
+    /**
+     * The Clear progress confirmation (SPEC §14) or a save-reset notice (SPEC §16) first, then the
+     * offer to resume an unfinished level (SPEC §15).
+     */
     private fun showNotices() {
+        if (cleared) {
+            notice("cleared", str("clear.done.title"), str("clear.done.body"))
+            return
+        }
         val outcome = game.loadOutcome
         if (outcome == LoadOutcome.RESTORED_BACKUP || outcome == LoadOutcome.RESET) {
             game.loadOutcome = LoadOutcome.OK
-            val panel = ui.panel()
-            panel.add(ui.label(str("notice.title"), "title")).padBottom(10f).row()
             val key = if (outcome == LoadOutcome.RESET) "notice.reset" else "notice.restored"
-            panel.add(ui.label(str(key), wrap = true)).fillX().padBottom(16f).row()
-            panel
-                .add(
-                    probe(
-                        "overlay-notice-ok",
-                        ui.button(str("notice.ok"), "primary") {
-                            closeOverlay()
-                            offerResume()
-                        },
-                    ),
-                ).width(Panels.WIDE_W)
-                .height(Panels.BUTTON_H)
-            showOverlay("notice", panel)
+            notice("notice", str("notice.title"), str(key))
             return
         }
         offerResume()
+    }
+
+    private fun notice(
+        name: String,
+        title: String,
+        body: String,
+    ) {
+        val panel = ui.panel()
+        panel.add(ui.label(title, "title")).padBottom(10f).row()
+        panel.add(ui.label(body, wrap = true)).fillX().padBottom(16f).row()
+        panel
+            .add(
+                probe(
+                    "overlay-$name-ok",
+                    ui.button(str("notice.ok"), "primary") {
+                        closeOverlay()
+                        offerResume()
+                    },
+                ),
+            ).width(Panels.WIDE_W)
+            .height(Panels.BUTTON_H)
+        showOverlay(name, panel)
     }
 
     private fun offerResume() {
@@ -365,7 +381,28 @@ class SettingsScreen(
 
     init {
         val panels = Panels(game, ui) { pid, b -> probe(pid, b) }
-        root.add(panels.settings { onBack() }).width(VIRTUAL_WIDTH - 48f)
+        root.add(panels.settings(onClose = { onBack() }, onClearProgress = ::confirmClear)).width(VIRTUAL_WIDTH - 48f)
+    }
+
+    /** One confirmation before wiping everything but the settings (SPEC §14). */
+    private fun confirmClear() {
+        val panel = ui.panel()
+        panel.add(ui.label(str("clear.title"), "title")).padBottom(10f).row()
+        panel.add(ui.label(str("clear.body"), wrap = true)).fillX().padBottom(16f).row()
+        val row = Table()
+        row.defaults().height(Panels.BUTTON_H).pad(4f).expandX().fillX()
+        row.add(probe("overlay-clear-cancel", ui.button(str("clear.cancel")) { closeOverlay() }))
+        row.add(
+            probe(
+                "overlay-clear-confirm",
+                ui.button(str("clear.confirm"), "danger") {
+                    game.clearProgress()
+                    game.go(WorldMapScreen(game, cleared = true))
+                },
+            ),
+        )
+        panel.add(row).fillX()
+        showOverlay("clear", panel)
     }
 
     override fun onBack() = game.go(WorldMapScreen(game))

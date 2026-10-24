@@ -6,6 +6,7 @@ import com.sortopia.gen.Tuning
 import com.sortopia.model.LevelId
 import com.sortopia.save.SaveData
 import com.sortopia.save.SaveStore
+import com.sortopia.save.Settings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -201,6 +202,47 @@ class SortopiaUiTest {
         assertFalse(settings.music)
         assertTrue(settings.reduceMotion)
         assertTrue(settings.sfx)
+    }
+
+    @Test
+    fun clearProgressKeepsOnlyTheSettings() {
+        val solved = (1..LevelId.LEVELS_PER_WORLD).map { LevelId.Campaign(1, it) }
+        val seeded =
+            SaveData(
+                wallet = 777,
+                best = solved.associate { it.key to Tuning.basePoints(it) },
+                flags = listOf("tutorial-done", "tips-helpers"),
+                settings = Settings(music = false, reduceMotion = true),
+            )
+        d.seed(seeded)
+        d.seed(seeded) // A second write fills a backup, which the reset must delete.
+        d.launch()
+        d.tap("settings")
+        d.waitScreen("settings")
+        d.tap("setting-clear")
+        d.waitOverlay("clear")
+        d.tap("overlay-clear-cancel")
+        d.waitUntil("overlay closed") { d.state("overlay") == "" }
+        assertEquals(seeded, d.readSave())
+
+        d.tap("setting-clear")
+        d.waitOverlay("clear")
+        d.screenshot("clear-confirm")
+        d.tap("overlay-clear-confirm")
+        d.waitScreen("map")
+        d.waitOverlay("cleared")
+        d.tap("overlay-cleared-ok")
+        d.waitUntil("notice closed") { d.state("overlay") == "" }
+        d.close()
+
+        val cleared = SaveData(settings = seeded.settings)
+        assertEquals(cleared, d.readSave())
+        assertEquals(Helpers.STARTING_WALLET, d.readSave().wallet)
+        // The old progress is gone from the backups too (closing the app saves again, so the
+        // cleared save may already have rotated into one).
+        for (file in d.saveDir.listFiles()!!) {
+            assertEquals(file.name, cleared, d.store().decode(file.readBytes()))
+        }
     }
 
     @Test

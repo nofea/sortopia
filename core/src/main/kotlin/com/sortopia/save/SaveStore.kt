@@ -78,6 +78,17 @@ class SaveStore(
         atomicWrite(main, bytes)
     }
 
+    /**
+     * Replaces the save with [data] and deletes the backups, so a cleared save can never be
+     * restored from them (SPEC §16). The main file is written first: a crash in between leaves
+     * either the old save or the new one, never neither.
+     */
+    fun reset(data: SaveData) {
+        Files.createDirectories(dir)
+        atomicWrite(main, encode(data))
+        backups.forEach { Files.deleteIfExists(it) }
+    }
+
     fun encode(data: SaveData): ByteArray {
         val payload = json.encodeToString(SaveData.serializer(), data)
         val mac = Base64.getEncoder().encodeToString(macProvider.mac(payload.toByteArray(Charsets.UTF_8)))

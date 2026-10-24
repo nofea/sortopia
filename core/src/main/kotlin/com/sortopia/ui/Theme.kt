@@ -32,6 +32,7 @@ object Theme {
     val buttonFace: Color = Color.valueOf("FFFFFF")
     val primary: Color = Color.valueOf("FF8A5B")
     val good: Color = Color.valueOf("3DBE8B")
+    val danger: Color = Color.valueOf("E5534B")
     val locked: Color = Color(1f, 1f, 1f, 0.42f)
     val highlight: Color = Color.valueOf("FFE066")
 

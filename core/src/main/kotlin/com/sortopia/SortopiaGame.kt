@@ -17,6 +17,7 @@ import com.sortopia.save.LoadOutcome
 import com.sortopia.save.SaveData
 import com.sortopia.save.SaveStore
 import com.sortopia.save.Settings
+import com.sortopia.save.clearedProgress
 import com.sortopia.ui.Assets
 import com.sortopia.ui.Audio
 import com.sortopia.ui.screens.SplashScreen
@@ -102,6 +103,17 @@ class SortopiaGame(
     fun updateSave(transform: (SaveData) -> SaveData) {
         progress.update(transform)
         save()
+    }
+
+    /** Wipes all progress but keeps the settings, backups included (SPEC §15). */
+    fun clearProgress() {
+        progress = Progress(progress.snapshot().clearedProgress())
+        try {
+            store.reset(progress.snapshot())
+        } catch (e: IOException) {
+            Gdx.app.error(TAG, "Clearing the save failed: ${e.javaClass.simpleName}")
+        }
+        audio.refreshMusic()
     }
 
     fun updateSettings(transform: (Settings) -> Settings) {

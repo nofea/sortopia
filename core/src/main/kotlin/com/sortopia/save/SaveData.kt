@@ -41,6 +41,9 @@ data class SaveData(
     }
 }
 
+/** A fresh start that keeps only the player's settings (SPEC §15: Clear progress). */
+fun SaveData.clearedProgress(): SaveData = SaveData(settings = settings)
+
 /** Compact, validated text form of [SessionEvent]s for [InProgress]. */
 object EventCodec {
     private val pour = Regex("""p(\d{1,2})>(\d{1,2})""")
