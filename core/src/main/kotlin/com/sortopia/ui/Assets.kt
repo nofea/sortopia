@@ -127,6 +127,7 @@ class Assets(
         skin.add("default", buttonStyle(Theme.buttonFace, Theme.ink))
         skin.add("primary", buttonStyle(Theme.primary, Color.WHITE))
         skin.add("good", buttonStyle(Theme.good, Color.WHITE))
+        skin.add("danger", buttonStyle(Theme.danger, Color.WHITE))
         skin.add("default", ScrollPane.ScrollPaneStyle())
         return skin
     }

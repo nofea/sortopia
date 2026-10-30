@@ -284,7 +284,8 @@ Splash → World Map ─┬→ Level Select → Gameplay → Level Complete ─�
                     │                     ↕ Pause menu           ├→ Replay
                     ├→ Daily Puzzle → Gameplay                    └→ Level Select
                     ├→ Endless Select → Gameplay
-                    └→ Settings
+                    ├→ Settings
+                    └→ About
 ```
 
 - **Splash:** shown on a **cold start only** (returning from the background resumes where the player was). It doubles as the loading screen and can't be skipped.
@@ -304,7 +305,8 @@ Splash → World Map ─┬→ Level Select → Gameplay → Level Complete ─�
 - **Gameplay HUD:** move counter, par, timer, wallet, and helper buttons (Undo, Hint, Extra tube, Restart) with their costs. Pause button.
 - **Pause menu:** resume, restart, mechanic help card, settings, quit to level select.
 - **Level Complete:** score breakdown (moves vs par, time vs parTime), stars earned (animated), points added to the wallet, new-best indicator, and buttons for Next / Replay / Levels.
-- **Settings:** see §14.
+- **Settings:** see §14. Opened from the World Map, it also offers **Clear progress** (§15).
+- **About:** opened from the World Map header (the "i" button beside Settings). Shows the game name, the creator ("Created by Sheen Games"), the installed app version (the Android `versionName`) and the font credit, with a Back button to the World Map.
 - **Safe area:** the game draws edge to edge. The world background fills the whole screen, but every screen's content and overlays stay inside the display's safe area, so camera cutouts (hole-punch, notch) and rounded corners never hide the HUD or buttons.
 
 ---
@@ -345,6 +347,7 @@ Splash → World Map ─┬→ Level Select → Gameplay → Level Complete ─�
 - **Colorblind palette:** a toggle that recolours item bodies with an alternate high-distinction palette. Silhouettes and fixed details stay the same.
 - **Audio & haptics:** separate on/off toggles for sound effects, music, and vibration.
 - **Reduce motion:** tones down or skips nonessential animations (celebrations, idle motion). Pours become quick transitions. The splash shows its final frame without motion (at most a quick fade), and its minimum time drops from 3 s to 1 s. It still waits until ready.
+- **Clear progress:** a red button on the Settings screen opened from the World Map. It never appears in the pause-menu settings, so progress can't be wiped mid-level. See §15.
 - Touch targets are at least 48dp. Text respects system font scaling where layout allows.
 - **Big tubes, forgiving taps:**
   - The board takes all the height between the HUD and the helper bar. The tutorial banner and toasts float over it.
@@ -365,6 +368,12 @@ Saved locally on the device:
 - settings
 
 The game saves automatically after every level completion, every helper purchase, and every settings change. In-progress level state is saved when the app goes to the background, so the player can resume mid-level.
+
+**Clear progress** (Settings, §14) lets the player start over:
+- One confirmation dialog ("Clear all progress? This can't be undone.") with Cancel and a red Clear button.
+- It wipes everything listed above **except the settings**: solved levels, best scores and stars, the wallet (back to the starting 300), Endless progress, the Daily history and streak, tutorial/tooltip flags, and any in-progress level. The tutorials play again.
+- The rotating backups are deleted too, so the old progress can never come back (§16).
+- The player returns to the World Map, which shows a short "Progress cleared" notice.
 
 ---
 
@@ -387,6 +396,7 @@ These requirements shape the game's features and must be kept in all designs.
 - A bad save must **never crash** the game.
 - The save carries an **HMAC checksum** made with a key held in the Android Keystore. It detects casual editing; it is not meant to stop determined attackers, which is acceptable for an offline game.
 - If a save fails its integrity or validation checks, the game restores the **last valid rotating backup**, and otherwise starts a **fresh save**. Any reset is shown to the player in a short, non-accusatory notice.
+- **Clear progress** (§15) replaces the save and deletes the rotating backups. The new save is written first, so an interruption leaves either the old save or the cleared one.
 - Saves are written **atomically** (write a temp file, then rename), so a crash or power loss can't corrupt them.
 - Save data lives in **app-private storage**. Android backup and data-extraction rules are set explicitly, never left to defaults.
 
@@ -394,7 +404,7 @@ These requirements shape the game's features and must be kept in all designs.
 - The art index and the audio files ship inside the app, but the game still reads them defensively. A malformed index line is skipped. A missing sprite draws nothing, and a missing or unreadable music track plays silence. Neither ever crashes the game.
 
 **Daily puzzle and the clock**
-- The device date is trusted, since the game is offline. Each date's 2× bonus is recorded once claimed and is never paid again, even if the clock is moved backwards.
+- The device date is trusted, since the game is offline. Each date's 2× bonus is recorded once claimed and is never paid again, even if the clock is moved backwards. The only exception is an explicit Clear progress (§15), which erases the claimed dates along with the wallet. This is harmless: the wallet restarts at 300 and the Daily stays locked until World 1 is finished again.
 
 **Release builds**
 - Code shrinking and obfuscation are enabled.

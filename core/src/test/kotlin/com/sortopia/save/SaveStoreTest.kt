@@ -1,5 +1,6 @@
 package com.sortopia.save
 
+import com.sortopia.game.Helpers
 import com.sortopia.gen.Tuning
 import com.sortopia.model.LevelId
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -122,5 +123,40 @@ class SaveStoreTest {
         val names = Files.list(dir).use { st -> st.map { it.fileName.toString() }.toList() }.toSet()
         assertEquals(setOf(SaveStore.MAIN, SaveStore.BACKUP_1, SaveStore.BACKUP_2), names)
         assertFalse(names.any { it.endsWith(".tmp") })
+    }
+
+    @Test
+    fun `cleared progress keeps only the settings`() {
+        val cleared = sample.copy(dailyClaims = listOf("2026-10-24")).clearedProgress()
+        assertEquals(SaveData(settings = Settings(music = false)), cleared)
+        assertEquals(Helpers.STARTING_WALLET, cleared.wallet)
+        assertTrue(cleared.best.isEmpty() && cleared.dailyClaims.isEmpty() && cleared.flags.isEmpty())
+        assertNull(cleared.inProgress)
+    }
+
+    @Test
+    fun `reset replaces the save and deletes the backups`() {
+        val s = store()
+        s.save(sample)
+        s.save(sample.copy(wallet = 500))
+        s.save(sample.copy(wallet = 600))
+        s.reset(sample.clearedProgress())
+        val names = Files.list(dir).use { st -> st.map { it.fileName.toString() }.toList() }.toSet()
+        assertEquals(setOf(SaveStore.MAIN), names)
+        val r = store().load()
+        assertEquals(LoadOutcome.OK, r.outcome)
+        assertEquals(sample.clearedProgress(), r.data)
+    }
+
+    @Test
+    fun `a corrupt save after a reset never brings back the old progress`() {
+        val s = store()
+        s.save(sample)
+        s.save(sample)
+        s.reset(sample.clearedProgress())
+        Files.writeString(dir.resolve(SaveStore.MAIN), "garbage")
+        val r = store().load()
+        assertEquals(LoadOutcome.RESET, r.outcome)
+        assertTrue(r.data.best.isEmpty())
     }
 }
