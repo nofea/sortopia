@@ -72,7 +72,7 @@ Score = BasePoints × (0.7 × min(1, par / moves) + 0.3 × min(1, parTime / time
 | ★★★ | Score ≥ 90% of BasePoints |
 
 ### 3.2 Replays
-- Replaying a level pays its **full score every time** it is solved.
+- Replaying a level pays its **full score every time** it is solved. The Daily Puzzle is the exception: it can't be replayed once solved (§10).
 - The game stores the **best score** and **best stars** per level. These never go down.
 
 ---
@@ -262,7 +262,9 @@ World 8 and Endless pick their mechanics per level from the seed, at mid-range d
 - One puzzle per calendar day, seeded from the **device's local date**, so everyone gets the same puzzle on the same date.
 - Difficulty is roughly the level of the player's furthest unlocked world, capped at World 8 parameters. The seed decides the layout, and the difficulty tier is part of the seed input.
 - The puzzle is played in the look of its difficulty-tier world: its items, tubes, background and music.
-- The **first** completion of a day's puzzle pays **2× points**. Replays pay normal points.
+- Completing a day's puzzle pays **2× points**.
+- Once a day's puzzle is solved it is **locked until the next local date**. The World Map's Daily entry then shows "Solved!" with a live countdown to the next puzzle (hours and minutes, rounded up) and the streak, and can't be opened; at midnight it opens to the new puzzle without leaving the screen. The Daily's Level Complete screen has no Replay: it shows the same countdown and a Done button.
+- A Daily left mid-play can still be resumed and finished after midnight, as long as its date hasn't been claimed; it pays 2× as that date's puzzle. An unfinished Daily whose date is already claimed is discarded instead of offered for resume.
 - A **daily streak** counts consecutive days on which the daily puzzle was completed. Missing a day resets it to 0.
 - A date's 2× bonus can be claimed only once, even if the device clock is changed (see §16).
 
@@ -299,12 +301,12 @@ Splash → World Map ─┬→ Level Select → Gameplay → Level Complete ─�
     At the cap the game moves on anyway, and any generation still running continues in the background.
   - **Waiting past 3 s:** the sealed tube bobs gently, and a subtle "Loading…" with animated dots appears.
   - On Android 12+, the system launch splash uses the game's background colour and launcher icon, so it hands off to this splash without a colour flash.
-- **World Map:** the 8 worlds plus Endless. Shows each world's emblem (its first item), lock state, stars earned per world, stars needed to unlock, the wallet, and the Daily Puzzle entry with streak. Menus use the neutral look and the menu music.
+- **World Map:** the 8 worlds plus Endless. Shows each world's emblem (its first item), lock state, stars earned per world, stars needed to unlock, the wallet, and the Daily Puzzle entry with streak (and, once today's is solved, the countdown to the next one, §10). Menus use the neutral look and the menu music.
 - **Level Select:** 20 levels per world, with lock state, best stars and best score.
 - **Endless Select:** a Continue button for the next unsolved endless level, the best endless total, and every endless level reached so far (20 per page) with best stars and best score, so any of them can be replayed. Quitting an endless level returns here.
-- **Gameplay HUD:** move counter, par, timer, wallet, and helper buttons (Undo, Hint, Extra tube, Restart) with their costs. Pause button.
+- **Gameplay HUD:** move counter, par, timer, wallet, and helper buttons (Undo, Hint, Extra tube, Restart) with their costs. Pause button. The level title, moves/par and timer are centred on the screen, whatever the wallet's width.
 - **Pause menu:** resume, restart, mechanic help card, settings, quit to level select.
-- **Level Complete:** score breakdown (moves vs par, time vs parTime), stars earned (animated), points added to the wallet, new-best indicator, and buttons for Next / Replay / Levels.
+- **Level Complete:** score breakdown (moves vs par, time vs parTime), stars earned (animated), points added to the wallet, new-best indicator, and buttons for Next / Replay / Levels. The Daily shows the countdown to the next Daily and only a Done button (§10).
 - **Settings:** see §14. Opened from the World Map, it also offers **Clear progress** (§15).
 - **About:** opened from the World Map header (the "i" button beside Settings). Shows the game name, the creator ("Created by Sheen Games"), the installed app version (the Android `versionName`) and the font credit, with a Back button to the World Map.
 - **Safe area:** the game draws edge to edge. The world background fills the whole screen, but every screen's content and overlays stay inside the display's safe area, so camera cutouts (hole-punch, notch) and rounded corners never hide the HUD or buttons.
@@ -404,7 +406,7 @@ These requirements shape the game's features and must be kept in all designs.
 - The art index and the audio files ship inside the app, but the game still reads them defensively. A malformed index line is skipped. A missing sprite draws nothing, and a missing or unreadable music track plays silence. Neither ever crashes the game.
 
 **Daily puzzle and the clock**
-- The device date is trusted, since the game is offline. Each date's 2× bonus is recorded once claimed and is never paid again, even if the clock is moved backwards. The only exception is an explicit Clear progress (§15), which erases the claimed dates along with the wallet. This is harmless: the wallet restarts at 300 and the Daily stays locked until World 1 is finished again.
+- The device date is trusted, since the game is offline. Each date's 2× bonus is recorded once claimed and is never paid again, even if the clock is moved backwards: a claimed date's Daily stays locked, and a saved in-progress run of it is discarded rather than resumed. The only exception is an explicit Clear progress (§15), which erases the claimed dates along with the wallet. This is harmless: the wallet restarts at 300 and the Daily stays locked until World 1 is finished again.
 
 **Release builds**
 - Code shrinking and obfuscation are enabled.
