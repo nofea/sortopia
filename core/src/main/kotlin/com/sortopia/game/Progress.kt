@@ -3,7 +3,9 @@ package com.sortopia.game
 import com.sortopia.gen.Tuning
 import com.sortopia.model.LevelId
 import com.sortopia.save.SaveData
+import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalDateTime
 import kotlin.math.ceil
 
 /** Pages of the Endless level picker (SPEC §9). [reached] is the highest playable level, [Progress.nextEndless]. */
@@ -23,6 +25,20 @@ object EndlessPages {
         val first = page * SIZE + 1
         return first..minOf(first + SIZE - 1, reached)
     }
+}
+
+/** When the next Daily Puzzle opens: at the next local midnight (SPEC §10). */
+object DailyClock {
+    fun untilNext(now: LocalDateTime): Duration = Duration.between(now, now.toLocalDate().plusDays(1).atStartOfDay())
+
+    /** [wait] as whole hours and minutes for display, rounded up so it never shows 0h 0m early. */
+    fun hoursMinutes(wait: Duration): Pair<Int, Int> {
+        val minutes = (wait.seconds + SECONDS_PER_MINUTE - 1) / SECONDS_PER_MINUTE
+        return (minutes / MINUTES_PER_HOUR).toInt() to (minutes % MINUTES_PER_HOUR).toInt()
+    }
+
+    private const val SECONDS_PER_MINUTE = 60L
+    private const val MINUTES_PER_HOUR = 60L
 }
 
 /** Result of recording a solved level. */
@@ -115,6 +131,12 @@ class Progress(
     fun dailyFor(today: LocalDate): LevelId.Daily = LevelId.Daily(today, furthestWorld())
 
     fun isDailyClaimed(date: LocalDate): Boolean = date.toString() in data.dailyClaims
+
+    /** A day's Daily can be played until it is solved, then it is locked until the next date (SPEC §10). */
+    fun isDailyPlayable(date: LocalDate): Boolean = isDailyUnlocked() && !isDailyClaimed(date)
+
+    /** Whether a level left mid-play may be resumed: not a Daily whose date is already claimed (SPEC §10, §15). */
+    fun isResumable(id: LevelId): Boolean = id !is LevelId.Daily || !isDailyClaimed(id.date)
 
     /** Consecutive claimed days ending today, or yesterday if today isn't done yet (SPEC §10). */
     fun dailyStreak(today: LocalDate): Int {

@@ -7,11 +7,13 @@ import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.scenes.scene2d.Actor
 import com.badlogic.gdx.scenes.scene2d.Touchable
 import com.badlogic.gdx.scenes.scene2d.actions.Actions
+import com.badlogic.gdx.scenes.scene2d.ui.Cell
 import com.badlogic.gdx.scenes.scene2d.ui.Label
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton
 import com.badlogic.gdx.utils.Align
 import com.sortopia.SortopiaGame
+import com.sortopia.game.DailyClock
 import com.sortopia.game.EndlessPages
 import com.sortopia.game.GameSession
 import com.sortopia.game.HelperResult
@@ -55,6 +57,9 @@ class GameScreen(
     private val movesLabel = ui.label("", "small")
     private val timerLabel = ui.label("", "small")
     private val walletLabel = ui.label("", "default")
+    private val wallet = Table()
+    private lateinit var pauseCell: Cell<Table>
+    private lateinit var walletCell: Cell<Table>
     private val banner = ui.label("", "default", wrap = true)
     private val toast = ui.label("", "light", wrap = true)
     private val loading = ui.label(str("game.preparing"), "title")
@@ -82,19 +87,21 @@ class GameScreen(
     private fun buildLayout() {
         val top = Table()
         val pause = probe("pause", ui.button("II") { openPause() }.apply { style = assets.accentStyle(theme.accent) })
-        top.add(pause).size(56f).left()
+        // The side cells are kept the same width (see fitHudSides), so the middle column sits on
+        // the screen's centre line however wide the wallet gets.
+        pauseCell = top.add(Table().apply { add(pause).size(PAUSE_SIZE).left().expandX() })
         val mid = Table()
         val title = Table()
         title.add(ui.emblem(theme, EMBLEM)).size(EMBLEM).padRight(4f)
         title.add(titleLabel)
-        mid.add(title).row()
-        mid.add(movesLabel).row()
-        mid.add(timerLabel)
+        mid.add(probe("hud-title", title)).row()
+        mid.add(probe("hud-moves", movesLabel)).row()
+        mid.add(probe("hud-timer", timerLabel))
         top.add(mid).expandX()
-        val wallet = Table()
         wallet.add(ui.coin(24f)).padRight(6f)
         wallet.add(probe("wallet", walletLabel))
-        top.add(wallet).right().minWidth(90f)
+        walletCell = top.add(Table().apply { add(wallet).right().expandX() })
+        fitHudSides()
         root.top().pad(8f)
         root.add(top).expandX().fillX().row()
         // The banner and toast float over the board instead of taking rows, so the tubes get the
@@ -248,10 +255,23 @@ class GameScreen(
 
     private fun refreshHud() {
         val s = session
-        walletLabel.setText(progress.wallet.points.toString())
+        val points = progress.wallet.points.toString()
+        if (!walletLabel.textEquals(points)) {
+            walletLabel.setText(points)
+            fitHudSides()
+        }
         if (s == null) return
         movesLabel.setText(str("hud.moves", s.moves) + "   " + str("hud.par", s.level.par))
         timerLabel.setText(formatTime(s.elapsedSeconds))
+    }
+
+    /** Gives the pause and wallet cells the same width, so the middle of the HUD is centred on screen. */
+    private fun fitHudSides() {
+        wallet.invalidate()
+        val side = maxOf(PAUSE_SIZE, WALLET_MIN_W, wallet.prefWidth)
+        pauseCell.width(side)
+        walletCell.width(side)
+        pauseCell.table?.invalidate()
     }
 
     private val tmp = Vector2()
@@ -584,11 +604,16 @@ class GameScreen(
         panel.add(points).padTop(8f).row()
         if (outcome.dailyBonus) panel.add(ui.label(str("complete.daily"))).row()
         if (outcome.newBest && s.moves > 0) panel.add(ui.label(str("complete.newbest"), "default")).row()
+        if (id is LevelId.Daily) {
+            val wait = DailyClock.untilNext(game.platform.now())
+            panel.add(probe("overlay-daily-next", ui.label(str("complete.daily.next", waitText(wait)), "soft"))).padTop(4f).row()
+        }
         val row = Table()
         row.defaults().height(Panels.BUTTON_H).pad(4f).expandX().fillX()
         val next = nextLevel()?.takeIf { progress.isUnlocked(it) }
         if (next != null) row.add(probe("overlay-next", ui.button(str("complete.next"), "primary") { game.go(GameScreen(game, next)) }))
-        row.add(probe("overlay-replay", ui.button(str("complete.replay")) { game.go(GameScreen(game, id)) }))
+        // A solved Daily stays locked until the next date (SPEC §10), so it has no Replay.
+        if (id !is LevelId.Daily) row.add(probe("overlay-replay", ui.button(str("complete.replay")) { game.go(GameScreen(game, id)) }))
         row.add(
             probe(
                 "overlay-levels",
@@ -689,6 +714,8 @@ class GameScreen(
         private const val TOAST_TIME = 2.2f
         private const val HELPER_H = 64f
         private const val EMBLEM = 26f
+        private const val PAUSE_SIZE = 56f
+        private const val WALLET_MIN_W = 90f
         private val TOAST_BACK = Color(0.17f, 0.12f, 0.25f, 0.72f)
         private val BANNER_BACK = Color(1f, 0.99f, 0.97f, 0.9f)
         private const val CONFETTI = 90
