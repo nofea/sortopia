@@ -3,6 +3,7 @@ package com.sortopia.platform
 import com.sortopia.save.MacProvider
 import java.nio.file.Path
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 enum class Haptic {
     LIGHT,
@@ -24,7 +25,10 @@ interface Platform {
 
     fun haptic(kind: Haptic)
 
-    fun today(): LocalDate = LocalDate.now()
+    fun today(): LocalDate = now().toLocalDate()
+
+    /** Local date and time, for the Daily countdown (SPEC §10). */
+    fun now(): LocalDateTime = LocalDateTime.now()
 }
 
 /**

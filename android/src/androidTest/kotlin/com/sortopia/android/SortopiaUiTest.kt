@@ -2,6 +2,7 @@ package com.sortopia.android
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sortopia.game.Helpers
+import com.sortopia.game.Wallet
 import com.sortopia.gen.Tuning
 import com.sortopia.model.LevelId
 import com.sortopia.save.SaveData
@@ -9,6 +10,8 @@ import com.sortopia.save.SaveStore
 import com.sortopia.save.Settings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -189,6 +192,46 @@ class SortopiaUiTest {
     }
 
     @Test
+    fun solvedDailyIsLockedUntilTomorrow() {
+        val best = (1..LevelId.LEVELS_PER_WORLD).associate { LevelId.Campaign(1, it).key to Tuning.basePoints(LevelId.Campaign(1, it)) }
+        d.seed(SaveData(best = best, flags = listOf("tutorial-done", "tips-helpers")))
+        d.launch()
+        d.tap("daily")
+        d.waitLevelReady()
+        d.solveLevel()
+        d.screenshot("daily-complete")
+        assertNull("a solved Daily has no Replay", DebugTestBridge.bounds("overlay-replay"))
+        assertNotNull("the countdown to the next Daily is shown", DebugTestBridge.bounds("overlay-daily-next"))
+        d.tap("overlay-levels")
+        d.waitScreen("map")
+        d.screenshot("daily-locked")
+        // The card no longer opens the puzzle.
+        d.tap("daily")
+        Thread.sleep(LOCKED_TAP_WAIT_MS)
+        assertEquals("map", DebugTestBridge.currentScreen)
+    }
+
+    @Test
+    fun hudIsCentredWhateverTheWallet() {
+        for (wallet in listOf(0, Wallet.MAX_POINTS)) {
+            d.clearSave()
+            d.seed(SaveData(wallet = wallet, flags = listOf("tutorial-done", "tips-helpers")))
+            d.launch()
+            openLevel(1, 1)
+            d.screenshot("hud-wallet-$wallet")
+            val centre = d.device.displayWidth / 2
+            for (id in listOf("hud-title", "hud-moves", "hud-timer")) {
+                val r = DebugTestBridge.bounds(id)!!
+                assertTrue(
+                    "$id is centred with wallet $wallet: centre ${r.centerX()} vs screen $centre",
+                    kotlin.math.abs(r.centerX() - centre) <= HUD_CENTRE_SLACK_PX,
+                )
+            }
+            d.close()
+        }
+    }
+
+    @Test
     fun settingsTogglesArePersisted() {
         d.launch()
         d.tap("settings")
@@ -294,5 +337,11 @@ class SortopiaUiTest {
 
         // App start-up and polling happen outside the splash's own clock.
         private const val SPLASH_SLACK_MS = 5_000L
+
+        // Long enough for a tap on the Daily card to have switched screens, had it opened.
+        private const val LOCKED_TAP_WAIT_MS = 1_500L
+
+        // Label widths round to whole pixels when centred.
+        private const val HUD_CENTRE_SLACK_PX = 4
     }
 }

@@ -17,10 +17,12 @@ import com.badlogic.gdx.scenes.scene2d.actions.Actions
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import com.badlogic.gdx.utils.viewport.ExtendViewport
 import com.sortopia.SortopiaGame
+import com.sortopia.game.DailyClock
 import com.sortopia.theme.Particle
 import com.sortopia.ui.Theme
 import com.sortopia.ui.Widgets
 import com.sortopia.ui.WorldTheme
+import java.time.Duration
 import kotlin.math.sin
 
 /**
@@ -42,6 +44,12 @@ abstract class BaseScreen(
         key: String,
         vararg args: Any,
     ) = assets.str(key, *args)
+
+    /** A wait such as the time to the next Daily, as "5h 12m". */
+    protected fun waitText(wait: Duration): String {
+        val (h, m) = DailyClock.hoursMinutes(wait)
+        return str("time.hm", h, m)
+    }
 
     private val probed = LinkedHashMap<String, Actor>()
     private var overlay: Table? = null

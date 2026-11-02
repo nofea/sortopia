@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.time.Duration
 import java.time.LocalDate
 
 class ProgressTest {
@@ -95,6 +96,44 @@ class ProgressTest {
         p.recordSolve(LevelId.Daily(day.plusDays(1), 1), result(100))
         // The clock goes back a day: that date's bonus was already claimed.
         assertFalse(p.recordSolve(LevelId.Daily(day, 1), result(100)).dailyBonus)
+    }
+
+    @Test
+    fun `a solved daily is locked until the next date`() {
+        val p = Progress(solved(1))
+        val today = LocalDate.of(2026, 10, 21)
+        assertFalse(Progress(SaveData()).isDailyPlayable(today))
+        assertTrue(p.isDailyPlayable(today))
+        p.recordSolve(LevelId.Daily(today, 2), result(100))
+        assertFalse(p.isDailyPlayable(today))
+        assertTrue(p.isDailyPlayable(today.plusDays(1)))
+    }
+
+    @Test
+    fun `an unfinished daily resumes only while its date is unclaimed`() {
+        val p = Progress(solved(1))
+        val yesterday = LocalDate.of(2026, 10, 20)
+        assertTrue(p.isResumable(LevelId.Daily(yesterday, 2)))
+        p.recordSolve(LevelId.Daily(yesterday, 2), result(100))
+        assertFalse(p.isResumable(LevelId.Daily(yesterday, 2)))
+        assertTrue(p.isResumable(c(1, 1)))
+        assertTrue(p.isResumable(LevelId.Endless(1)))
+    }
+
+    @Test
+    fun `next daily comes at the next local midnight`() {
+        val day = LocalDate.of(2026, 10, 21)
+        assertEquals(Duration.ofHours(12), DailyClock.untilNext(day.atTime(12, 0)))
+        assertEquals(Duration.ofSeconds(1), DailyClock.untilNext(day.atTime(23, 59, 59)))
+        assertEquals(Duration.ofDays(1), DailyClock.untilNext(day.atStartOfDay()))
+    }
+
+    @Test
+    fun `the wait shows as hours and minutes rounded up`() {
+        assertEquals(5 to 12, DailyClock.hoursMinutes(Duration.ofMinutes(5 * 60 + 12)))
+        assertEquals(0 to 1, DailyClock.hoursMinutes(Duration.ofSeconds(1)))
+        assertEquals(5 to 13, DailyClock.hoursMinutes(Duration.ofSeconds((5 * 60 + 12) * 60L + 30)))
+        assertEquals(24 to 0, DailyClock.hoursMinutes(Duration.ofDays(1)))
     }
 
     @Test

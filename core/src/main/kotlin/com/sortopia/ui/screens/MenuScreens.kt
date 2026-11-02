@@ -2,12 +2,14 @@ package com.sortopia.ui.screens
 
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.scenes.scene2d.actions.Actions
+import com.badlogic.gdx.scenes.scene2d.ui.Cell
 import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
 import com.badlogic.gdx.utils.Align
 import com.sortopia.SortopiaGame
+import com.sortopia.game.DailyClock
 import com.sortopia.game.EndlessPages
 import com.sortopia.gen.Tuning
 import com.sortopia.model.LevelId
@@ -25,6 +27,9 @@ class WorldMapScreen(
 ) : BaseScreen(game) {
     override val probeName = "map"
     private val progress get() = game.progress
+    private lateinit var dailyCell: Cell<Table>
+    private var dailyText = ""
+    private var sinceDailyCheck = 0f
 
     init {
         game.audio.playMusic(ThemeCatalog.MENU_TRACK)
@@ -51,7 +56,9 @@ class WorldMapScreen(
 
         val list = Table()
         list.defaults().expandX().fillX().padBottom(10f)
-        list.add(dailyCard()).row()
+        dailyText = dailySubtitle()
+        dailyCell = list.add(dailyCard())
+        dailyCell.row()
         for (w in 1..LevelId.WORLDS) list.add(worldCard(w)).row()
         list.add(endlessCard()).row()
         val scroll = ScrollPane(list, assets.skin)
@@ -133,17 +140,34 @@ class WorldMapScreen(
         }
     }
 
-    private fun dailyCard(): Table {
-        val unlocked = progress.isDailyUnlocked()
-        val today = game.platform.today()
-        val subtitle =
-            when {
-                !unlocked -> str("map.daily.locked")
-                progress.isDailyClaimed(today) -> str("map.daily.done") + "\n" + str("map.daily.streak", progress.dailyStreak(today))
-                else -> str("map.daily.new") + "\n" + str("map.daily.streak", progress.dailyStreak(today))
-            }
-        return card("daily", str("daily"), subtitle, !unlocked, Theme.dailyAccent) {
-            game.go(GameScreen(game, progress.dailyFor(today)))
+    /** The Daily card's text; a solved Daily shows the wait until the next one (SPEC §10). */
+    private fun dailySubtitle(): String {
+        val now = game.platform.now()
+        val today = now.toLocalDate()
+        val streak = str("map.daily.streak", progress.dailyStreak(today))
+        return when {
+            !progress.isDailyUnlocked() -> str("map.daily.locked")
+            progress.isDailyClaimed(today) -> str("map.daily.solved", waitText(DailyClock.untilNext(now))) + "\n" + streak
+            else -> str("map.daily.new") + "\n" + streak
+        }
+    }
+
+    private fun dailyCard(): Table =
+        card("daily", str("daily"), dailyText, !progress.isDailyUnlocked(), Theme.dailyAccent) {
+            // Solved today: it stays shut until the next date.
+            val today = game.platform.today()
+            if (progress.isDailyPlayable(today)) game.go(GameScreen(game, progress.dailyFor(today)))
+        }
+
+    // The countdown ticks, and at midnight the solved card opens to the new puzzle.
+    override fun update(delta: Float) {
+        sinceDailyCheck += delta
+        if (sinceDailyCheck < 1f) return
+        sinceDailyCheck = 0f
+        val text = dailySubtitle()
+        if (text != dailyText) {
+            dailyText = text
+            dailyCell.setActor(dailyCard())
         }
     }
 
@@ -191,6 +215,11 @@ class WorldMapScreen(
     private fun offerResume() {
         val ip = progress.data.inProgress ?: return
         val id = LevelId.parse(ip.levelKey) ?: return
+        if (!progress.isResumable(id)) {
+            // A replay of an already-solved Daily, saved before solved Dailies were locked.
+            game.updateSave { it.copy(inProgress = null) }
+            return
+        }
         val name =
             when (id) {
                 is LevelId.Campaign -> id.label
